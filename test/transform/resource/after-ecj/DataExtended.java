@@ -3,6 +3,9 @@
   public @java.lang.SuppressWarnings("all") DataExtended() {
     super();
   }
+  public @java.lang.Override @java.lang.SuppressWarnings("all") java.lang.String toString() {
+    return (("DataExtended(x=" + this.x) + ")");
+  }
   public @java.lang.SuppressWarnings("all") int getX() {
     return this.x;
   }
@@ -29,8 +32,5 @@
     int result = 1;
     result = ((result * PRIME) + this.getX());
     return result;
-  }
-  public @java.lang.Override @java.lang.SuppressWarnings("all") java.lang.String toString() {
-    return (("DataExtended(x=" + this.x) + ")");
   }
 }

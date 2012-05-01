@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 The Project Lombok Authors.
+ * Copyright (C) 2009-2012 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -26,19 +26,20 @@ import lombok.Data;
 import lombok.core.AnnotationValues;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
+import lombok.eclipse.handlers.HandleConstructor;
+import lombok.eclipse.handlers.HandleConstructor.ConstructorData;
+import lombok.eclipse.handlers.HandleConstructor.FieldProvider;
 
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
-import org.mangosdk.spi.ProviderFor;
 
 /**
  * Handles the {@code lombok.Data} annotation for eclipse.
  */
-@ProviderFor(EclipseAnnotationHandler.class)
+// @ProviderFor(EclipseAnnotationHandler.class) // TODO
 public class HandleData extends EclipseAnnotationHandler<Data> {
 	public void handle(AnnotationValues<Data> annotation, Annotation ast, EclipseNode annotationNode) {
-		Data ann = annotation.getInstance();
 		EclipseNode typeNode = annotationNode.up();
 		
 		TypeDeclaration typeDecl = null;
@@ -57,11 +58,23 @@ public class HandleData extends EclipseAnnotationHandler<Data> {
 		//most useful of the many methods built by @Data. This trick won't work for the non-static constructor,
 		//for whatever reason, though you can find callers of that one by focusing on the class name itself
 		//and hitting 'find callers'.
+		Data data = annotation.getInstance();
+		String staticConstructorName = data.staticConstructor();
+		boolean callSuper = data.callSuper();
 		
 		new HandleGetter().generateGetterForType(typeNode, annotationNode, AccessLevel.PUBLIC, true);
 		new HandleSetter().generateSetterForType(typeNode, annotationNode, AccessLevel.PUBLIC, true);
-		new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, annotationNode);
-		new HandleToString().generateToStringForType(typeNode, annotationNode);
-		new HandleConstructor().generateRequiredArgsConstructor(typeNode, AccessLevel.PUBLIC, ann.staticConstructor(), true, ast);
+		
+		new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, annotationNode, callSuper);
+		new HandleToString().generateToStringForType(typeNode, annotationNode, callSuper);
+		
+		if (!HandleConstructor.constructorOrConstructorAnnotationExists(typeNode)) {
+			final ConstructorData cData = new ConstructorData() //
+				.fieldProvider(FieldProvider.REQUIRED) //
+				.accessLevel(AccessLevel.PUBLIC) //
+				.staticName(staticConstructorName) //
+				.callSuper(callSuper);
+			new HandleConstructor().generateConstructor(typeNode, ast, cData);
+		}
 	}
 }

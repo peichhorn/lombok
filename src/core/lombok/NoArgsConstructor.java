@@ -47,6 +47,8 @@ public @interface NoArgsConstructor {
 	 */
 	String staticName() default "";
 	
+	boolean callSuper() default false;
+	
 	/**
 	 * Sets the access level of the constructor. By default, generated constructors are {@code public}.
 	 */

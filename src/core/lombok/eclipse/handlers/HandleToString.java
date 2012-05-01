@@ -80,7 +80,7 @@ public class HandleToString extends EclipseAnnotationHandler<ToString> {
 		}
 	}
 	
-	public void generateToStringForType(EclipseNode typeNode, EclipseNode errorNode) {
+	public void generateToStringForType(EclipseNode typeNode, EclipseNode errorNode, Boolean callSuper) {
 		for (EclipseNode child : typeNode.down()) {
 			if (child.getKind() == Kind.ANNOTATION) {
 				if (annotationTypeMatches(ToString.class, child)) {
@@ -94,7 +94,7 @@ public class HandleToString extends EclipseAnnotationHandler<ToString> {
 		try {
 			includeFieldNames = ((Boolean)ToString.class.getMethod("includeFieldNames").getDefaultValue()).booleanValue();
 		} catch (Exception ignore) {}
-		generateToString(typeNode, errorNode, null, null, includeFieldNames, null, false, FieldAccess.GETTER);
+		generateToString(typeNode, errorNode, null, null, includeFieldNames, callSuper, false, FieldAccess.GETTER);
 	}
 	
 	public void handle(AnnotationValues<ToString> annotation, Annotation ast, EclipseNode annotationNode) {
@@ -285,7 +285,7 @@ public class HandleToString extends EclipseAnnotationHandler<ToString> {
 	private String getTypeName(EclipseNode type) {
 		String typeName = getSingleTypeName(type);
 		EclipseNode upType = type.up();
-		while (upType.getKind() == Kind.TYPE) {
+		if (upType != null) while (upType.getKind() == Kind.TYPE) {
 			typeName = getSingleTypeName(upType) + "." + typeName;
 			upType = upType.up();
 		}

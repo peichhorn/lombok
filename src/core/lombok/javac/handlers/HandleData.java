@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009-2011 The Project Lombok Authors.
+ * Copyright (C) 2009-2012 The Project Lombok Authors.
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -21,12 +21,14 @@
  */
 package lombok.javac.handlers;
 
-import static lombok.javac.handlers.JavacHandlerUtil.deleteAnnotationIfNeccessary;
+import static lombok.javac.handlers.JavacHandlerUtil.*;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.core.AnnotationValues;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
+import lombok.javac.handlers.HandleConstructor.FieldProvider;
+import lombok.javac.handlers.HandleConstructor.ConstructorData;
 
 import org.mangosdk.spi.ProviderFor;
 
@@ -52,13 +54,25 @@ public class HandleData extends JavacAnnotationHandler<Data> {
 			return;
 		}
 		
-		String staticConstructorName = annotation.getInstance().staticConstructor();
+		Data data = annotation.getInstance();
+		String staticConstructorName = data.staticConstructor();
+		boolean callSuper = data.callSuper();
 		
 		// TODO move this to the end OR move it to the top in eclipse.
-		new HandleConstructor().generateRequiredArgsConstructor(typeNode, AccessLevel.PUBLIC, staticConstructorName, true, annotationNode);
+		
+		if (!HandleConstructor.constructorOrConstructorAnnotationExists(typeNode)) {
+			final ConstructorData cData = new ConstructorData() //
+				.fieldProvider(FieldProvider.REQUIRED) //
+				.accessLevel(AccessLevel.PUBLIC) //
+				.staticName(staticConstructorName) //
+				.callSuper(callSuper);
+			new HandleConstructor().generateConstructor(typeNode, ast, cData);
+		}
+		
 		new HandleGetter().generateGetterForType(typeNode, annotationNode, AccessLevel.PUBLIC, true);
 		new HandleSetter().generateSetterForType(typeNode, annotationNode, AccessLevel.PUBLIC, true);
-		new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, annotationNode);
-		new HandleToString().generateToStringForType(typeNode, annotationNode);
+		
+		new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, annotationNode, callSuper);
+		new HandleToString().generateToStringForType(typeNode, annotationNode, callSuper);
 	}
 }

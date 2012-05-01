@@ -107,7 +107,7 @@ public class HandleEqualsAndHashCode extends EclipseAnnotationHandler<EqualsAndH
 		}
 	}
 	
-	public void generateEqualsAndHashCodeForType(EclipseNode typeNode, EclipseNode errorNode) {
+	public void generateEqualsAndHashCodeForType(EclipseNode typeNode, EclipseNode errorNode, Boolean callSuper) {
 		for (EclipseNode child : typeNode.down()) {
 			if (child.getKind() == Kind.ANNOTATION) {
 				if (annotationTypeMatches(EqualsAndHashCode.class, child)) {
@@ -117,7 +117,7 @@ public class HandleEqualsAndHashCode extends EclipseAnnotationHandler<EqualsAndH
 			}
 		}
 		
-		generateMethods(typeNode, errorNode, null, null, null, false, FieldAccess.GETTER);
+		generateMethods(typeNode, errorNode, null, null, callSuper, false, FieldAccess.GETTER);
 	}
 	
 	@Override public void handle(AnnotationValues<EqualsAndHashCode> annotation,

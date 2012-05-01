@@ -6,6 +6,15 @@
     super();
     this.z = z;
   }
+  public @java.lang.SuppressWarnings("all") int getX() {
+    return this.x;
+  }
+  public @java.lang.SuppressWarnings("all") int getY() {
+    return this.y;
+  }
+  public @java.lang.SuppressWarnings("all") String getZ() {
+    return this.z;
+  }
   public @java.lang.SuppressWarnings("all") void setX(final int x) {
     this.x = x;
   }
@@ -44,14 +53,5 @@
   }
   public @java.lang.Override @java.lang.SuppressWarnings("all") java.lang.String toString() {
     return (((((("DataWithGetter(x=" + this.getX()) + ", y=") + this.getY()) + ", z=") + this.getZ()) + ")");
-  }
-  public @java.lang.SuppressWarnings("all") int getX() {
-    return this.x;
-  }
-  public @java.lang.SuppressWarnings("all") int getY() {
-    return this.y;
-  }
-  public @java.lang.SuppressWarnings("all") String getZ() {
-    return this.z;
   }
 }
