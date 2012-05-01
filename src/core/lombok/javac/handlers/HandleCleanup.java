@@ -22,12 +22,14 @@
 package lombok.javac.handlers;
 
 import static lombok.javac.handlers.JavacHandlerUtil.*;
+
 import lombok.Cleanup;
 import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
 import lombok.javac.Javac;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
+import lombok.javac.ResolutionBased;
 
 import org.mangosdk.spi.ProviderFor;
 
@@ -45,6 +47,7 @@ import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 import com.sun.tools.javac.tree.JCTree.JCIdent;
 import com.sun.tools.javac.tree.JCTree.JCIf;
+import com.sun.tools.javac.tree.JCTree.JCInstanceOf;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
 import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.tree.JCTree.JCStatement;
@@ -58,6 +61,7 @@ import com.sun.tools.javac.util.Name;
  * Handles the {@code lombok.Cleanup} annotation for javac.
  */
 @ProviderFor(JavacAnnotationHandler.class)
+@ResolutionBased
 public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	@Override public void handle(AnnotationValues<Cleanup> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		deleteAnnotationIfNeccessary(annotationNode, Cleanup.class);
@@ -113,16 +117,30 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 		doAssignmentCheck(annotationNode, tryBlock.toList(), decl.name);
 		
 		TreeMaker maker = annotationNode.getTreeMaker();
-		JCFieldAccess cleanupMethod = maker.Select(maker.Ident(decl.name), annotationNode.toName(cleanupName));
-		List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
-				maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+		JCBlock finalizer;
 		
-		JCMethodInvocation preventNullAnalysis = preventNullAnalysis(maker, annotationNode, maker.Ident(decl.name));
-		JCBinary isNull = maker.Binary(Javac.getCtcInt(JCTree.class, "NE"), preventNullAnalysis, maker.Literal(Javac.getCtcInt(TypeTags.class, "BOT"), null));
-		
-		JCIf ifNotNullCleanup = maker.If(isNull, maker.Block(0, cleanupCall), null);
-		
-		JCBlock finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifNotNullCleanup)), ast);
+		if ("close".equals(cleanupName) && !annotation.isExplicit("value")) {
+			JCFieldAccess cleanupMethod = maker.Select(maker.TypeCast(chainDotsString(annotationNode, "java.io.Closeable"), maker.Ident(decl.name)), annotationNode.toName(cleanupName));
+			List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
+					maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+			
+			JCInstanceOf isClosable = maker.TypeTest(maker.Ident(decl.name), chainDotsString(annotationNode, "java.io.Closeable"));
+			
+			JCIf ifIsClosableCleanup = maker.If(isClosable, maker.Block(0, cleanupCall), null);
+			
+			finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifIsClosableCleanup)), ast);
+		} else {
+			JCFieldAccess cleanupMethod = maker.Select(maker.Ident(decl.name), annotationNode.toName(cleanupName));
+			List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
+					maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+			
+			JCMethodInvocation preventNullAnalysis = preventNullAnalysis(maker, annotationNode, maker.Ident(decl.name));
+			JCBinary isNull = maker.Binary(Javac.getCtcInt(JCTree.class, "NE"), preventNullAnalysis, maker.Literal(Javac.getCtcInt(TypeTags.class, "BOT"), null));
+			
+			JCIf ifNotNullCleanup = maker.If(isNull, maker.Block(0, cleanupCall), null);
+			
+			finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifNotNullCleanup)), ast);
+		}
 		
 		newStatements.append(setGeneratedBy(maker.Try(setGeneratedBy(maker.Block(0, tryBlock.toList()), ast), List.<JCCatch>nil(), finalizer), ast));
 		
@@ -149,8 +167,7 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	
 	private void doAssignmentCheck0(JavacNode node, JCTree statement, Name name) {
 		if (statement instanceof JCAssign) doAssignmentCheck0(node, ((JCAssign)statement).rhs, name);
-		if (statement instanceof JCExpressionStatement) doAssignmentCheck0(node,
-				((JCExpressionStatement)statement).expr, name);
+		if (statement instanceof JCExpressionStatement) doAssignmentCheck0(node, ((JCExpressionStatement)statement).expr, name);
 		if (statement instanceof JCVariableDecl) doAssignmentCheck0(node, ((JCVariableDecl)statement).init, name);
 		if (statement instanceof JCTypeCast) doAssignmentCheck0(node, ((JCTypeCast)statement).expr, name);
 		if (statement instanceof JCIdent) {

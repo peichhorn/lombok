@@ -28,6 +28,7 @@ import java.util.Arrays;
 import lombok.Cleanup;
 import lombok.core.AnnotationValues;
 import lombok.core.AST.Kind;
+import lombok.eclipse.Eclipse;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
 
@@ -41,15 +42,19 @@ import org.eclipse.jdt.internal.compiler.ast.CastExpression;
 import org.eclipse.jdt.internal.compiler.ast.EqualExpression;
 import org.eclipse.jdt.internal.compiler.ast.Expression;
 import org.eclipse.jdt.internal.compiler.ast.IfStatement;
+import org.eclipse.jdt.internal.compiler.ast.InstanceOfExpression;
 import org.eclipse.jdt.internal.compiler.ast.LocalDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.MemberValuePair;
 import org.eclipse.jdt.internal.compiler.ast.MessageSend;
 import org.eclipse.jdt.internal.compiler.ast.NullLiteral;
 import org.eclipse.jdt.internal.compiler.ast.OperatorIds;
+import org.eclipse.jdt.internal.compiler.ast.QualifiedTypeReference;
 import org.eclipse.jdt.internal.compiler.ast.SingleNameReference;
+import org.eclipse.jdt.internal.compiler.ast.SingleTypeReference;
 import org.eclipse.jdt.internal.compiler.ast.Statement;
 import org.eclipse.jdt.internal.compiler.ast.SwitchStatement;
 import org.eclipse.jdt.internal.compiler.ast.TryStatement;
+import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.mangosdk.spi.ProviderFor;
 
 /**
@@ -122,6 +127,9 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			}
 		} else end = statements.length;
 		
+		int pS = ast.sourceStart, pE = ast.sourceEnd;
+		long p = (long)pS << 32 | pE;
+		
 		//At this point:
 		//  start-1 = Local Declaration marked with @Cleanup
 		//  start = first instruction that needs to be wrapped into a try block
@@ -161,46 +169,80 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 		newStatements[start] = tryStatement;
 		
 		Statement[] finallyBlock = new Statement[1];
-		MessageSend unsafeClose = new MessageSend();
-		setGeneratedBy(unsafeClose, ast);
-		unsafeClose.sourceStart = ast.sourceStart;
-		unsafeClose.sourceEnd = ast.sourceEnd;
-		SingleNameReference receiver = new SingleNameReference(decl.name, 0);
-		setGeneratedBy(receiver, ast);
-		unsafeClose.receiver = receiver;
-		long nameSourcePosition = (long)ast.sourceStart << 32 | ast.sourceEnd;
-		if (ast.memberValuePairs() != null) for (MemberValuePair pair : ast.memberValuePairs()) {
-			if (pair.name != null && new String(pair.name).equals("value")) {
-				nameSourcePosition = (long)pair.value.sourceStart << 32 | pair.value.sourceEnd;
-				break;
+		
+		if ("close".equals(cleanupName) && !annotation.isExplicit("value")) {
+			SingleNameReference varName = new SingleNameReference(decl.name, p);
+			setGeneratedBy(varName, ast);
+			final CastExpression castExpression = makeCastExpression(varName, generateQualifiedTypeRef(ast, "java".toCharArray(), "io".toCharArray(), "Closeable".toCharArray()), ast);
+			setGeneratedBy(castExpression, ast);
+			
+			MessageSend safeClose = new MessageSend();
+			setGeneratedBy(safeClose, ast);
+			safeClose.sourceStart = ast.sourceStart;
+			safeClose.sourceEnd = ast.sourceEnd;
+			safeClose.receiver = castExpression;
+			long nameSourcePosition = (long)ast.sourceStart << 32 | ast.sourceEnd;
+			if (ast.memberValuePairs() != null) for (MemberValuePair pair : ast.memberValuePairs()) {
+				if (pair.name != null && new String(pair.name).equals("value")) {
+					nameSourcePosition = (long)pair.value.sourceStart << 32 | pair.value.sourceEnd;
+					break;
+				}
 			}
+			safeClose.nameSourcePosition = nameSourcePosition;
+			safeClose.selector = cleanupName.toCharArray();
+			
+			varName = new SingleNameReference(decl.name, p);
+			setGeneratedBy(varName, ast);
+			final InstanceOfExpression isClosable = new InstanceOfExpression(varName, generateQualifiedTypeRef(ast, "java".toCharArray(), "io".toCharArray(), "Closeable".toCharArray()));
+			setGeneratedBy(isClosable, ast);
+			
+			Block closeBlock = new Block(0);
+			closeBlock.statements = new Statement[1];
+			closeBlock.statements[0] = safeClose;
+			setGeneratedBy(closeBlock, ast);
+			IfStatement ifStatement = new IfStatement(isClosable, closeBlock, 0, 0);
+			setGeneratedBy(ifStatement, ast);
+			
+			finallyBlock[0] = ifStatement;
+		} else {
+			MessageSend unsafeClose = new MessageSend();
+			setGeneratedBy(unsafeClose, ast);
+			unsafeClose.sourceStart = ast.sourceStart;
+			unsafeClose.sourceEnd = ast.sourceEnd;
+			SingleNameReference receiver = new SingleNameReference(decl.name, 0);
+			setGeneratedBy(receiver, ast);
+			unsafeClose.receiver = receiver;
+			long nameSourcePosition = (long)ast.sourceStart << 32 | ast.sourceEnd;
+			if (ast.memberValuePairs() != null) for (MemberValuePair pair : ast.memberValuePairs()) {
+				if (pair.name != null && new String(pair.name).equals("value")) {
+					nameSourcePosition = (long)pair.value.sourceStart << 32 | pair.value.sourceEnd;
+					break;
+				}
+			}
+			unsafeClose.nameSourcePosition = nameSourcePosition;
+			unsafeClose.selector = cleanupName.toCharArray();
+			
+			SingleNameReference varName = new SingleNameReference(decl.name, p);
+			setGeneratedBy(varName, ast);
+			NullLiteral nullLiteral = new NullLiteral(pS, pE);
+			setGeneratedBy(nullLiteral, ast);
+			
+			MessageSend preventNullAnalysis = preventNullAnalysis(ast, varName);
+			
+			EqualExpression equalExpression = new EqualExpression(preventNullAnalysis, nullLiteral, OperatorIds.NOT_EQUAL);
+			equalExpression.sourceStart = pS; equalExpression.sourceEnd = pE;
+			setGeneratedBy(equalExpression, ast);
+			
+			Block closeBlock = new Block(0);
+			closeBlock.statements = new Statement[1];
+			closeBlock.statements[0] = unsafeClose;
+			setGeneratedBy(closeBlock, ast);
+			IfStatement ifStatement = new IfStatement(equalExpression, closeBlock, 0, 0);
+			setGeneratedBy(ifStatement, ast);
+			
+			finallyBlock[0] = ifStatement;
 		}
-		unsafeClose.nameSourcePosition = nameSourcePosition;
-		unsafeClose.selector = cleanupName.toCharArray();
 		
-		
-		int pS = ast.sourceStart, pE = ast.sourceEnd;
-		long p = (long)pS << 32 | pE;
-
-		SingleNameReference varName = new SingleNameReference(decl.name, p);
-		setGeneratedBy(varName, ast);
-		NullLiteral nullLiteral = new NullLiteral(pS, pE);
-		setGeneratedBy(nullLiteral, ast);
-		
-		MessageSend preventNullAnalysis = preventNullAnalysis(ast, varName);
-		
-		EqualExpression equalExpression = new EqualExpression(preventNullAnalysis, nullLiteral, OperatorIds.NOT_EQUAL);
-		equalExpression.sourceStart = pS; equalExpression.sourceEnd = pE;
-		setGeneratedBy(equalExpression, ast);
-		
-		Block closeBlock = new Block(0);
-		closeBlock.statements = new Statement[1];
-		closeBlock.statements[0] = unsafeClose;
-		setGeneratedBy(closeBlock, ast);
-		IfStatement ifStatement = new IfStatement(equalExpression, closeBlock, 0, 0);
-		setGeneratedBy(ifStatement, ast);
-		
-		finallyBlock[0] = ifStatement;
 		tryStatement.finallyBlock = new Block(0);
 		
 		// Positions for in-method generated nodes are special
@@ -252,6 +294,19 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 		preventNullAnalysis.sourceEnd = singletonList.statementEnd = pE;
 		
 		return preventNullAnalysis;
+	}
+	
+	private TypeReference generateQualifiedTypeRef(ASTNode source, char[]... varNames) {
+		int pS = source.sourceStart, pE = source.sourceEnd;
+		long p = (long)pS << 32 | pE;
+		
+		TypeReference ref;
+		
+		long[] poss = Eclipse.poss(source, varNames.length);
+		if (varNames.length > 1) ref = new QualifiedTypeReference(varNames, poss);
+		else ref = new SingleTypeReference(varNames[0], p);
+		setGeneratedBy(ref, source);
+		return ref;
 	}
 	
 	private void doAssignmentCheck(EclipseNode node, Statement[] tryBlock, char[] varName) {

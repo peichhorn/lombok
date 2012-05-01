@@ -9,8 +9,8 @@ class CleanupPlain {
 					out.flush();
 				}
 			} finally {
-				if (java.util.Collections.singletonList(out).get(0) != null) {
-					out.close();
+				if (out instanceof java.io.Closeable) {
+					((java.io.Closeable)out).close();
 				}
 			}
 		} finally {
