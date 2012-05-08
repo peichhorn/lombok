@@ -21,8 +21,6 @@
  */
 package lombok.eclipse.agent;
 
-import static lombok.patcher.scripts.ScriptBuilder.exitEarly;
-
 import java.lang.instrument.Instrumentation;
 import java.util.Collection;
 import java.util.Collections;
@@ -546,18 +544,8 @@ public class EclipsePatcher extends Agent {
 	private static void patchEcjTransformers(ScriptManager sm, boolean ecj) {
 		addPatchesForDelegate(sm, ecj);
 		addPatchesForVal(sm);
-		addPatchesForConstructorAndData(sm);
 		if (!ecj) addPatchesForValEclipse(sm);
-	}
-	
-	private static void addPatchesForConstructorAndData(ScriptManager sm) {
-		final String HOOK_NAME = PatchConstructorAndData.class.getName();
-		final String CLASSSCOPE = "org.eclipse.jdt.internal.compiler.lookup.ClassScope";
-		sm.addScript(exitEarly()
-			.target(new MethodTarget(CLASSSCOPE, "buildFieldsAndMethods", "void"))
-			.request(StackRequest.THIS)
-			.decisionMethod(new Hook(HOOK_NAME, "onClassScope_buildFieldsAndMethods", "boolean", CLASSSCOPE))
-			.build());
+		if (!ecj) addPatchesForConstructorAndDataEclipse(sm);
 	}
 	
 	private static void addPatchesForDelegate(ScriptManager sm, boolean ecj) {
@@ -648,6 +636,18 @@ public class EclipsePatcher extends Agent {
 				.target(new MethodTarget(FOREACHSTATEMENT_SIG, "resolve", "void", BLOCKSCOPE_SIG))
 				.request(StackRequest.THIS, StackRequest.PARAM1)
 				.decisionMethod(new Hook("lombok.eclipse.agent.PatchVal", "handleValForForEach", "boolean", FOREACHSTATEMENT_SIG, BLOCKSCOPE_SIG))
+				.build());
+	}
+	
+	private static void addPatchesForConstructorAndDataEclipse(ScriptManager sm) {
+		final String SOURCEELEMENTNOTIFIER = "org.eclipse.jdt.internal.compiler.SourceElementNotifier";
+		final String FIELDDECLARATION = "org.eclipse.jdt.internal.compiler.ast.FieldDeclaration";
+		final String TYPEDECLARATION = "org.eclipse.jdt.internal.compiler.ast.TypeDeclaration";
+		final String ISOURCEELEMENTREQUESTOR = "org.eclipse.jdt.internal.compiler.ISourceElementRequestor";
+		sm.addScript(ScriptBuilder.replaceMethodCall()
+				.target(new MethodTarget(SOURCEELEMENTNOTIFIER, "notifySourceElementRequestor", "void", FIELDDECLARATION, TYPEDECLARATION))
+				.methodToReplace(new Hook(ISOURCEELEMENTREQUESTOR, "exitField", "void", "int", "int", "int"))
+				.replacementMethod(new Hook("lombok.eclipse.agent.PatchConstructorAndDataEclipsePortal", "onSourceElementRequestor_exitField", "void", "java.lang.Object", "int", "int", "int"))
 				.build());
 	}
 	

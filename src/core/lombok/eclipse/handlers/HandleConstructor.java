@@ -23,7 +23,7 @@ package lombok.eclipse.handlers;
 
 import static lombok.eclipse.Eclipse.*;
 import static lombok.eclipse.handlers.EclipseHandlerUtil.*;
-import static lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult.NOT_EXISTS;
+import static lombok.eclipse.handlers.EclipseHandlerUtil.MemberExistsResult.EXISTS_BY_USER;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -39,6 +39,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.core.AST.Kind;
 import lombok.core.AnnotationValues;
 import lombok.core.TransformationsUtil;
+import lombok.eclipse.DeferUntilBuildFieldsAndMethods;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
 
@@ -73,9 +74,11 @@ import org.eclipse.jdt.internal.compiler.lookup.MethodBinding;
 import org.eclipse.jdt.internal.compiler.lookup.ReferenceBinding;
 import org.eclipse.jdt.internal.compiler.lookup.SourceTypeBinding;
 import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
+import org.mangosdk.spi.ProviderFor;
 
 public class HandleConstructor {
-	// @ProviderFor(EclipseAnnotationHandler.class) // TODO
+	@ProviderFor(EclipseAnnotationHandler.class)
+	@DeferUntilBuildFieldsAndMethods
 	public static class HandleNoArgsConstructor extends EclipseAnnotationHandler<NoArgsConstructor> {
 		@Override public void handle(AnnotationValues<NoArgsConstructor> annotation, Annotation ast, EclipseNode annotationNode) {
 			final NoArgsConstructor instance = annotation.getInstance();
@@ -88,7 +91,8 @@ public class HandleConstructor {
 		}
 	}
 	
-	// @ProviderFor(EclipseAnnotationHandler.class) // TODO
+	@ProviderFor(EclipseAnnotationHandler.class)
+	@DeferUntilBuildFieldsAndMethods
 	public static class HandleRequiredArgsConstructor extends EclipseAnnotationHandler<RequiredArgsConstructor> {
 		@Override public void handle(AnnotationValues<RequiredArgsConstructor> annotation, Annotation ast, EclipseNode annotationNode) {
 			final RequiredArgsConstructor instance = annotation.getInstance();
@@ -102,7 +106,8 @@ public class HandleConstructor {
 		}
 	}
 	
-	// @ProviderFor(EclipseAnnotationHandler.class) // TODO
+	@ProviderFor(EclipseAnnotationHandler.class)
+	@DeferUntilBuildFieldsAndMethods
 	public static class HandleAllArgsConstructor extends EclipseAnnotationHandler<AllArgsConstructor> {
 		@Override public void handle(AnnotationValues<AllArgsConstructor> annotation, Annotation ast, EclipseNode annotationNode) {
 			final AllArgsConstructor instance = annotation.getInstance();
@@ -131,7 +136,7 @@ public class HandleConstructor {
 	}
 	
 	public static boolean constructorOrConstructorAnnotationExists(final EclipseNode typeNode) {
-		boolean constructorExists = constructorExists(typeNode) != NOT_EXISTS;
+		boolean constructorExists = constructorExists(typeNode) == EXISTS_BY_USER;
 		if (!constructorExists) for (EclipseNode child : typeNode.down()) {
 			if (child.getKind() == Kind.ANNOTATION) {
 				if (annotationTypeMatches(NoArgsConstructor.class, child) //
@@ -154,6 +159,7 @@ public class HandleConstructor {
 				MethodDeclaration staticConstr = createStaticConstructor(typeNode, source, data, superConstructor);
 				injectMethod(typeNode, staticConstr);
 			}
+			typeNode.rebuild();
 		}
 	}
 	
@@ -265,10 +271,11 @@ public class HandleConstructor {
 	}
 	
 	private boolean isLocalType(EclipseNode type) {
-		Kind kind = type.up().getKind();
-		if (kind == Kind.COMPILATION_UNIT) return false;
-		if (kind == Kind.TYPE) return isLocalType(type.up());
-		return true;
+		EclipseNode typeNode = type.up();
+		while ((typeNode != null) && !(typeNode.get() instanceof TypeDeclaration)) {
+			typeNode = typeNode.up();
+		}
+		return typeNode != null;
 	}
 	
 	private MethodDeclaration createStaticConstructor(final EclipseNode typeNode, final ASTNode source, final ConstructorData data, final SuperConstructor superConstructor) {
@@ -471,7 +478,7 @@ public class HandleConstructor {
 					if (!filterField(fieldDecl)) continue;
 					boolean isFinal = (fieldDecl.modifiers & ClassFileConstants.AccFinal) != 0;
 					boolean isNonNull = findAnnotations(fieldDecl, TransformationsUtil.NON_NULL_PATTERN).length != 0;
-					if ((isFinal || isNonNull) && fieldDecl.initialization == null) fields.add(child);
+					if ((isFinal || isNonNull) && (fieldDecl.initialization == null)) fields.add(child);
 				}
 				return fields;
 			}
@@ -484,7 +491,7 @@ public class HandleConstructor {
 					final FieldDeclaration fieldDecl = (FieldDeclaration) child.get();
 					if (!filterField(fieldDecl)) continue;
 					boolean isFinal = (fieldDecl.modifiers & ClassFileConstants.AccFinal) != 0;
-					if (isFinal && fieldDecl.initialization != null) continue;
+					if (isFinal && (fieldDecl.initialization != null)) continue;
 					fields.add(child);
 				}
 				return fields;

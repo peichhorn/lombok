@@ -24,6 +24,7 @@ package lombok.eclipse.handlers;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.core.AnnotationValues;
+import lombok.eclipse.DeferUntilBuildFieldsAndMethods;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
 import lombok.eclipse.handlers.HandleConstructor;
@@ -33,11 +34,13 @@ import lombok.eclipse.handlers.HandleConstructor.FieldProvider;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
+import org.mangosdk.spi.ProviderFor;
 
 /**
  * Handles the {@code lombok.Data} annotation for eclipse.
  */
-// @ProviderFor(EclipseAnnotationHandler.class) // TODO
+@ProviderFor(EclipseAnnotationHandler.class)
+@DeferUntilBuildFieldsAndMethods
 public class HandleData extends EclipseAnnotationHandler<Data> {
 	public void handle(AnnotationValues<Data> annotation, Annotation ast, EclipseNode annotationNode) {
 		EclipseNode typeNode = annotationNode.up();

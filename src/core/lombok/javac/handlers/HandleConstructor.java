@@ -23,7 +23,7 @@ package lombok.javac.handlers;
 
 import static lombok.core.AST.Kind.ANNOTATION;
 import static lombok.javac.handlers.JavacHandlerUtil.*;
-import static lombok.javac.handlers.JavacHandlerUtil.MemberExistsResult.NOT_EXISTS;
+import static lombok.javac.handlers.JavacHandlerUtil.MemberExistsResult.EXISTS_BY_USER;
 
 import java.lang.annotation.Annotation;
 
@@ -127,7 +127,7 @@ public class HandleConstructor {
 	}
 	
 	public static boolean constructorOrConstructorAnnotationExists(final JavacNode typeNode) {
-		boolean constructorExists = constructorExists(typeNode) != NOT_EXISTS;
+		boolean constructorExists = constructorExists(typeNode) == EXISTS_BY_USER;
 		if (!constructorExists) for (JavacNode child : typeNode.down()) {
 			if (child.getKind() == ANNOTATION) {
 				if (annotationTypeMatches(NoArgsConstructor.class, child) //
@@ -150,6 +150,7 @@ public class HandleConstructor {
 				JCMethodDecl staticConstr = createStaticConstructor(typeNode, source, data, superConstructor);
 				injectMethod(typeNode, staticConstr);
 			}
+			typeNode.rebuild();
 		}
 	}
 	
@@ -207,10 +208,11 @@ public class HandleConstructor {
 	}
 	
 	private boolean isLocalType(JavacNode type) {
-		Kind kind = type.up().getKind();
-		if (kind == Kind.COMPILATION_UNIT) return false;
-		if (kind == Kind.TYPE) return isLocalType(type.up());
-		return true;
+		JavacNode typeNode = type.up();
+		while ((typeNode != null) && !(typeNode.get() instanceof JCClassDecl)) {
+			typeNode = typeNode.up();
+		}
+		return typeNode != null;
 	}
 	
 	private JCMethodDecl createStaticConstructor(JavacNode typeNode, JCTree source, final ConstructorData data, final SuperConstructor superConstructor) {
