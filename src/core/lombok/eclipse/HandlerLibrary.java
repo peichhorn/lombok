@@ -44,6 +44,8 @@ import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
+import org.eclipse.jdt.internal.compiler.impl.ITypeRequestor;
+import org.eclipse.jdt.internal.compiler.lookup.CompilationUnitScope;
 import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
 
 /**
@@ -206,13 +208,27 @@ public class HandlerLibrary {
 		}
 	}
 	
-	public void handleAnnotationOnBuildFieldsAndMethods(EclipseAST ast, TypeDeclaration decl, org.eclipse.jdt.internal.compiler.ast.Annotation annotation) {
+	public void handleAnnotationOnBuildFieldsAndMethods(EclipseNode typeNode, org.eclipse.jdt.internal.compiler.ast.Annotation annotation) {
+		TypeDeclaration decl = (TypeDeclaration) typeNode.get();
 		TypeBinding tb = resolveAnnotation(decl, annotation);
 		if (tb == null) return;
 		AnnotationHandlerContainer<?> container = annotationHandlers.get(new String(tb.readableName()));
 		if (container == null) return;
 		if (!container.deferUntilBuildFieldsAndMethods()) return;
-		EclipseNode annotationNode = ast.get(annotation);
+		EclipseNode annotationNode = typeNode.getAst().get(annotation);
+		if (!typeNode.isCompleteParse() && (decl.scope != null)) {
+			final CompilationUnitScope cus = decl.scope.compilationUnitScope();
+			final ITypeRequestor typeRequestor = cus.environment().typeRequestor;
+			if (typeRequestor instanceof org.eclipse.jdt.internal.compiler.Compiler) {
+				final org.eclipse.jdt.internal.compiler.Compiler c = (org.eclipse.jdt.internal.compiler.Compiler) typeRequestor;
+				try {
+					c.parser.getMethodBodies(cus.referenceContext);
+					typeNode.rebuild();
+				} catch (Exception e) {
+					// better break here
+				}
+			}
+		}
 		try {
 			if (checkAndSetHandled(annotation)) container.handle(annotation, annotationNode);
 		} catch (AnnotationValueDecodeFail fail) {

@@ -21,10 +21,12 @@
  */
 package lombok.eclipse;
 
-import static lombok.eclipse.handlers.EclipseHandlerUtil.error;
+import static lombok.eclipse.handlers.EclipseHandlerUtil.*;
+import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 
 import java.lang.reflect.Field;
 
+import lombok.core.AST.Kind;
 import lombok.core.debug.DebugSnapshotStore;
 import lombok.patcher.Symbols;
 
@@ -185,7 +187,18 @@ public class TransformEclipseAST {
 		}
 		if (typeNode == null) return false;
 		if (decl.annotations != null) for (Annotation ann : decl.annotations) {
-			handlers.handleAnnotationOnBuildFieldsAndMethods(ast, decl, ann);
+			handlers.handleAnnotationOnBuildFieldsAndMethods(typeNode, ann);
+		}
+		for (EclipseNode child : typeNode.down()) {
+			Annotation[] annotations = null;
+			if (child.getKind() == Kind.METHOD) {
+				annotations = ((AbstractMethodDeclaration) child.get()).annotations;
+			} else if (child.getKind() == Kind.FIELD) {
+				annotations = ((AbstractVariableDeclaration) child.get()).annotations;
+			}
+			if (annotations != null) for (Annotation ann : annotations) {
+				handlers.handleAnnotationOnBuildFieldsAndMethods(typeNode, ann);
+			}
 		}
 		return false;
 	}
