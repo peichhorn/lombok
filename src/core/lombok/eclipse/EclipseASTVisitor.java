@@ -114,10 +114,6 @@ public interface EclipseASTVisitor {
 		private int indent = 0;
 		private boolean printClassNames = false;
 		
-		public boolean deferUntilPostDiet() {
-			return false;
-		}
-		
 		/**
 		 * @param printContent if true, bodies are printed directly, as java code,
 		 * instead of a tree listing of every AST node inside it.
