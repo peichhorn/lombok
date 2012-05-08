@@ -534,6 +534,13 @@ public class EclipsePatcher extends Agent {
 				.target(new MethodTarget(PARSER_SIG, "endParse", CUD_SIG, "int"))
 				.wrapMethod(new Hook("lombok.eclipse.TransformEclipseAST", "transform_swapped", "void", CUD_SIG, PARSER_SIG))
 				.request(StackRequest.THIS, StackRequest.RETURN_VALUE).build());
+		
+		final String CLASSSCOPE = "org.eclipse.jdt.internal.compiler.lookup.ClassScope";
+		sm.addScript(ScriptBuilder.exitEarly()
+			.target(new MethodTarget(CLASSSCOPE, "buildFieldsAndMethods", "void"))
+			.request(StackRequest.THIS)
+			.decisionMethod(new Hook("lombok.eclipse.TransformEclipseAST", "handleAnnotationOnBuildFieldsAndMethods", "boolean", CLASSSCOPE))
+			.build());
 	}
 	
 	private static void patchEcjTransformers(ScriptManager sm, boolean ecj) {

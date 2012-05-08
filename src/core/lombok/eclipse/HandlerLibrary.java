@@ -42,7 +42,9 @@ import lombok.core.AnnotationValues.AnnotationValueDecodeFail;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
+import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
 
 /**
  * This class tracks 'handlers' and knows how to invoke them for any given AST node.
@@ -82,6 +84,10 @@ public class HandlerLibrary {
 		
 		public boolean deferUntilPostDiet() {
 			return handler.getClass().isAnnotationPresent(DeferUntilPostDiet.class);
+		}
+		
+		public boolean deferUntilBuildFieldsAndMethods() {
+			return handler.getClass().isAnnotationPresent(DeferUntilBuildFieldsAndMethods.class);
 		}
 	}
 	
@@ -184,6 +190,7 @@ public class HandlerLibrary {
 			AnnotationHandlerContainer<?> container = annotationHandlers.get(fqn);
 			
 			if (container == null) continue;
+			if (container.deferUntilBuildFieldsAndMethods()) continue;
 			if (!annotationNode.isCompleteParse() && container.deferUntilPostDiet()) {
 				if (needsHandling(annotation)) container.preHandle(annotation, annotationNode);
 				continue;
@@ -197,6 +204,32 @@ public class HandlerLibrary {
 				error(ast, String.format("Lombok annotation handler %s failed", container.handler.getClass()), t);
 			}
 		}
+	}
+	
+	public void handleAnnotationOnBuildFieldsAndMethods(EclipseAST ast, TypeDeclaration decl, org.eclipse.jdt.internal.compiler.ast.Annotation annotation) {
+		TypeBinding tb = resolveAnnotation(decl, annotation);
+		if (tb == null) return;
+		AnnotationHandlerContainer<?> container = annotationHandlers.get(new String(tb.readableName()));
+		if (container == null) return;
+		if (!container.deferUntilBuildFieldsAndMethods()) return;
+		EclipseNode annotationNode = ast.get(annotation);
+		try {
+			if (checkAndSetHandled(annotation)) container.handle(annotation, annotationNode);
+		} catch (AnnotationValueDecodeFail fail) {
+			fail.owner.setError(fail.getMessage(), fail.idx);
+		}
+	}
+	
+	private TypeBinding resolveAnnotation(TypeDeclaration decl, org.eclipse.jdt.internal.compiler.ast.Annotation ann) {
+		TypeBinding tb = ann.resolvedType;
+		if ((tb == null) && (ann.type != null)) {
+			try {
+				tb = ann.type.resolveType(decl.initializerScope);
+			} catch (final Exception ignore) {
+				// completion nodes may throw an exception here
+			}
+		}
+		return tb;
 	}
 	
 	/**
