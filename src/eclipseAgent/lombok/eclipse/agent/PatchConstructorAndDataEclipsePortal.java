@@ -24,13 +24,16 @@ package lombok.eclipse.agent;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
+import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
+
 import lombok.Lombok;
 
 public class PatchConstructorAndDataEclipsePortal {
 	
-	public static void onSourceElementRequestor_exitField(Object requestor, int initializationStart, int declarationEnd, int declarationSourceEnd) {
+	public static void onSourceElementRequestor_exitField(Object requestor, int initializationStart, int declarationEnd, int declarationSourceEnd, FieldDeclaration fieldDeclaration, TypeDeclaration typeDeclaration) {
 		try {
-			Reflection.onSourceElementRequestor_exitFieldMethod.invoke(null, requestor, initializationStart, declarationEnd, declarationSourceEnd);
+			Reflection.onSourceElementRequestor_exitFieldMethod.invoke(null, requestor, initializationStart, declarationEnd, declarationSourceEnd, fieldDeclaration, typeDeclaration);
 		} catch (NoClassDefFoundError e) {
 			//ignore, we don't have access to the correct ECJ classes, so lombok can't possibly
 			//do anything useful here.
@@ -52,7 +55,7 @@ public class PatchConstructorAndDataEclipsePortal {
 			Method m = null;
 			Throwable problem_ = null;
 			try {
-				m = PatchConstructorAndDataEclipse.class.getMethod("onSourceElementRequestor_exitField", Class.forName("org.eclipse.jdt.internal.compiler.ISourceElementRequestor"), int.class, int.class, int.class);
+				m = PatchConstructorAndDataEclipse.class.getMethod("onSourceElementRequestor_exitField", Class.forName("org.eclipse.jdt.internal.compiler.ISourceElementRequestor"), int.class, int.class, int.class, FieldDeclaration.class, TypeDeclaration.class);
 			} catch (Throwable t) {
 				// That's problematic, but as long as no local classes are used we don't actually need it.
 				// Better fail on local classes than crash altogether.

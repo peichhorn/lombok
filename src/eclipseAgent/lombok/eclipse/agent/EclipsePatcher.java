@@ -647,7 +647,8 @@ public class EclipsePatcher extends Agent {
 		sm.addScript(ScriptBuilder.replaceMethodCall()
 				.target(new MethodTarget(SOURCEELEMENTNOTIFIER, "notifySourceElementRequestor", "void", FIELDDECLARATION, TYPEDECLARATION))
 				.methodToReplace(new Hook(ISOURCEELEMENTREQUESTOR, "exitField", "void", "int", "int", "int"))
-				.replacementMethod(new Hook("lombok.eclipse.agent.PatchConstructorAndDataEclipsePortal", "onSourceElementRequestor_exitField", "void", "java.lang.Object", "int", "int", "int"))
+				.requestExtra(StackRequest.PARAM1, StackRequest.PARAM2)
+				.replacementMethod(new Hook("lombok.eclipse.agent.PatchConstructorAndDataEclipsePortal", "onSourceElementRequestor_exitField", "void", "java.lang.Object", "int", "int", "int", FIELDDECLARATION, TYPEDECLARATION))
 				.build());
 	}
 	

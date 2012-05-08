@@ -168,11 +168,12 @@ public class TransformationsUtil {
 	 * @param isBoolean if the field is of type 'boolean'. For fields of type 'java.lang.Boolean', you should provide {@code false}.
 	 */
 	public static List<String> toAllGetterNames(AnnotationValues<Accessors> accessors, CharSequence fieldName, boolean isBoolean) {
+		if (fieldName.length() == 0) return Collections.emptyList();
 		if (!isBoolean) return Collections.singletonList(toGetterName(accessors, fieldName, false));
 		
 		Accessors acc = accessors.getInstance();
 		fieldName = removePrefix(fieldName, acc.prefix());
-		if (fieldName == null) return Collections.emptyList();
+		if ((fieldName == null) || (fieldName.length() == 0)) return Collections.emptyList();
 		
 		List<String> baseNames = toBaseNames(fieldName, isBoolean, acc.fluent());
 		
@@ -199,11 +200,12 @@ public class TransformationsUtil {
 	 * @param isBoolean if the field is of type 'boolean'. For fields of type 'java.lang.Boolean', you should provide {@code false}.
 	 */
 	public static List<String> toAllSetterNames(AnnotationValues<Accessors> accessors, CharSequence fieldName, boolean isBoolean) {
+		if (fieldName.length() == 0) return Collections.emptyList();
 		if (!isBoolean) return Collections.singletonList(toSetterName(accessors, fieldName, false));
 		
 		Accessors acc = accessors.getInstance();
 		fieldName = removePrefix(fieldName, acc.prefix());
-		if (fieldName == null) return Collections.emptyList();
+		if ((fieldName == null) || (fieldName.length() == 0)) return Collections.emptyList();
 		
 		List<String> baseNames = toBaseNames(fieldName, isBoolean, acc.fluent());
 		

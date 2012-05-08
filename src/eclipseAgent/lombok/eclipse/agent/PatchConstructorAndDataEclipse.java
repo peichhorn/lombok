@@ -26,28 +26,47 @@ import java.util.Map;
 import java.util.Stack;
 
 import org.eclipse.jdt.internal.compiler.ISourceElementRequestor;
+import org.eclipse.jdt.internal.compiler.ast.Annotation;
+import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.TypeReference;
 import org.eclipse.jdt.internal.compiler.parser.Parser;
 import org.eclipse.jdt.internal.core.CompilationUnitStructureRequestor;
 import org.eclipse.jdt.internal.core.JavaElement;
 import org.eclipse.jdt.internal.core.SourceFieldElementInfo;
 
 public class PatchConstructorAndDataEclipse {
-
-	public static void onSourceElementRequestor_exitField(ISourceElementRequestor requestor, int initializationStart, int declarationEnd, int declarationSourceEnd) throws Exception {
-		if ((requestor instanceof CompilationUnitStructureRequestor) && (initializationStart != -1)) {
-			CompilationUnitStructureRequestor cusRequestor = (CompilationUnitStructureRequestor) requestor;
-			JavaElement handle = (JavaElement) getHandleStack(cusRequestor).peek();
-			requestor.exitField(initializationStart, declarationEnd, declarationSourceEnd);
-			SourceFieldElementInfo info = (SourceFieldElementInfo) getNewElements(cusRequestor).get(handle);
-			int length = declarationEnd - initializationStart;
-			if (length > 0) {
-				char[] initializer = new char[length];
-				System.arraycopy(getParser(cusRequestor).scanner.source, initializationStart, initializer, 0, length);
-				setInitializationSource(info, initializer);
+	
+	public static void onSourceElementRequestor_exitField(ISourceElementRequestor requestor, int initializationStart, int declarationEnd, int declarationSourceEnd, FieldDeclaration fieldDeclaration, TypeDeclaration typeDeclaration) throws Exception {
+		if (requestor instanceof CompilationUnitStructureRequestor) {
+			boolean isAnnotatedWithConstructorOrData = false;
+			if (typeDeclaration.annotations != null) for (Annotation annotation : typeDeclaration.annotations) {
+				TypeReference annotationType = annotation.type;
+				if (annotationType == null) continue;
+				String type = new String(annotationType.getLastToken());
+				if (type.equals("Data") || type.equals("AllArgsConstructor") || type.equals("NoArgsConstructor") || type.equals("RequiredArgsConstructor")) {
+					isAnnotatedWithConstructorOrData = true;
+					break;
+				}
 			}
-		} else {
-			requestor.exitField(initializationStart, declarationEnd, declarationSourceEnd);
+			if (isAnnotatedWithConstructorOrData) {
+				if (fieldDeclaration.initialization != null) initializationStart = fieldDeclaration.initialization.sourceStart;
+				if (initializationStart != -1) {
+					CompilationUnitStructureRequestor cusRequestor = (CompilationUnitStructureRequestor) requestor;
+					JavaElement handle = (JavaElement) getHandleStack(cusRequestor).peek();
+					requestor.exitField(initializationStart, declarationEnd, declarationSourceEnd);
+					SourceFieldElementInfo info = (SourceFieldElementInfo) getNewElements(cusRequestor).get(handle);
+					int length = declarationEnd - initializationStart;
+					if (length > 0) {
+						char[] initializer = new char[length];
+						System.arraycopy(getParser(cusRequestor).scanner.source, initializationStart, initializer, 0, length);
+						setInitializationSource(info, initializer);
+					}
+					return;
+				}
+			}
 		}
+		requestor.exitField(initializationStart, declarationEnd, declarationSourceEnd);
 	}
 	
 	private static Stack<?> getHandleStack(CompilationUnitStructureRequestor requestor) throws Exception {
@@ -85,7 +104,7 @@ public class PatchConstructorAndDataEclipse {
 				d = SourceFieldElementInfo.class.getDeclaredField("initializationSource");
 				d.setAccessible(true);
 			} catch (Throwable t) {
-				//ignore
+				// ignore
 			}
 			
 			handleStackField = a;

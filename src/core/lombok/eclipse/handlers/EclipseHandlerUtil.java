@@ -783,6 +783,7 @@ public class EclipseHandlerUtil {
 				if (potentialGetter.getKind() != Kind.METHOD) continue;
 				if (!(potentialGetter.get() instanceof MethodDeclaration)) continue;
 				MethodDeclaration method = (MethodDeclaration) potentialGetter.get();
+				if (method.selector == null) continue;
 				if (!potentialGetterName.equalsIgnoreCase(new String(method.selector))) continue;
 				/** static getX() methods don't count. */
 				if ((method.modifiers & ClassFileConstants.AccStatic) != 0) continue;
@@ -1123,12 +1124,18 @@ public class EclipseHandlerUtil {
 			if (typeDecl.methods != null) for (AbstractMethodDeclaration def : typeDecl.methods) {
 				if (def instanceof ConstructorDeclaration) {
 					if ((def.bits & ASTNode.IsDefaultConstructor) != 0) continue;
+					if (isGeneratedByBuilder((ConstructorDeclaration) def)) continue;
 					return getGeneratedBy(def) == null ? MemberExistsResult.EXISTS_BY_USER : MemberExistsResult.EXISTS_BY_LOMBOK;
 				}
 			}
 		}
 		
 		return MemberExistsResult.NOT_EXISTS;
+	}
+	
+	// TODO weird hack, looking for a decent solution...
+	private static boolean isGeneratedByBuilder(ConstructorDeclaration def) {
+		return ((def.arguments != null) && (def.arguments.length == 1) && "$Builder".equals(new String(def.arguments[0].type.getLastToken())));
 	}
 	
 	/**
