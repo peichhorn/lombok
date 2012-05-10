@@ -176,6 +176,8 @@ public class TransformEclipseAST {
 	public static boolean handleAnnotationOnBuildFieldsAndMethods(ClassScope scope) {
 		if (disableLombok) return false;
 		
+		if (Symbols.hasSymbol("lombok.disable")) return false;
+		
 		TypeDeclaration decl = scope.referenceContext;
 		if (decl == null) return false;
 		CompilationUnitDeclaration cud = decl.scope.compilationUnitScope().referenceContext;

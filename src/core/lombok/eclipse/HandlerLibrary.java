@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import lombok.Lombok;
+import lombok.core.AST.Kind;
 import lombok.core.AnnotationValues;
 import lombok.core.PrintAST;
 import lombok.core.SpiLoadUtil;
@@ -216,7 +217,7 @@ public class HandlerLibrary {
 		if (container == null) return;
 		if (!container.deferUntilBuildFieldsAndMethods()) return;
 		EclipseNode annotationNode = typeNode.getAst().get(annotation);
-		if (!typeNode.isCompleteParse() && (decl.scope != null)) {
+		if (isMethodAnnotation(annotationNode) && !typeNode.isCompleteParse() && (decl.scope != null)) {
 			final CompilationUnitScope cus = decl.scope.compilationUnitScope();
 			final ITypeRequestor typeRequestor = cus.environment().typeRequestor;
 			if (typeRequestor instanceof org.eclipse.jdt.internal.compiler.Compiler) {
@@ -234,6 +235,12 @@ public class HandlerLibrary {
 		} catch (AnnotationValueDecodeFail fail) {
 			fail.owner.setError(fail.getMessage(), fail.idx);
 		}
+	}
+	
+	private boolean isMethodAnnotation(EclipseNode annotationNode) {
+		EclipseNode parent = annotationNode.up();
+		if (parent == null) return false;
+		return parent.getKind() == Kind.METHOD;
 	}
 	
 	private TypeBinding resolveAnnotation(TypeDeclaration decl, org.eclipse.jdt.internal.compiler.ast.Annotation ann) {
