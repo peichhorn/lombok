@@ -36,7 +36,7 @@ import lombok.eclipse.EclipseAST;
 import lombok.eclipse.EclipseNode;
 import lombok.eclipse.TransformEclipseAST;
 import lombok.eclipse.handlers.EclipseHandlerUtil;
-import lombok.experimental.ExtensionMethod;
+import lombok.ExtensionMethod;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;

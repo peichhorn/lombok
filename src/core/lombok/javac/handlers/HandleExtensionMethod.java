@@ -31,7 +31,7 @@ import java.util.List;
 import javax.lang.model.element.ElementKind;
 
 import lombok.core.AnnotationValues;
-import lombok.experimental.ExtensionMethod;
+import lombok.ExtensionMethod;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
 import lombok.javac.ResolutionBased;

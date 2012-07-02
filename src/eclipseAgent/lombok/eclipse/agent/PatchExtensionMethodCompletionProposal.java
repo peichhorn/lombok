@@ -32,7 +32,7 @@ import java.util.List;
 
 import lombok.eclipse.EclipseNode;
 import lombok.eclipse.agent.PatchExtensionMethod.Extension;
-import lombok.experimental.ExtensionMethod;
+import lombok.ExtensionMethod;
 
 import org.eclipse.jdt.core.CompletionProposal;
 import org.eclipse.jdt.internal.codeassist.InternalCompletionContext;
