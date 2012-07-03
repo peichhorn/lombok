@@ -61,16 +61,16 @@ public class JavacTransformer {
 		if (!postResolution) {
 			handlers.setPreResolutionPhase();
 			for (JavacAST ast : asts) {
-				ast.traverse(new AnnotationVisitor());
 				handlers.callASTVisitors(ast);
+				ast.traverse(new AnnotationVisitor());
 			}
 		}
 		
 		if (postResolution) {
 			handlers.setPostResolutionPhase();
 			for (JavacAST ast : asts) {
-				ast.traverse(new AnnotationVisitor());
 				handlers.callASTVisitors(ast);
+				ast.traverse(new AnnotationVisitor());
 			}
 			
 			handlers.setPrintASTPhase();
