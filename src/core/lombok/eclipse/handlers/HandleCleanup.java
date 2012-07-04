@@ -23,6 +23,7 @@ package lombok.eclipse.handlers;
 
 import static lombok.eclipse.handlers.EclipseHandlerUtil.*;
 
+import java.lang.reflect.Modifier;
 import java.util.Arrays;
 
 import lombok.Cleanup;
@@ -35,6 +36,7 @@ import lombok.eclipse.EclipseNode;
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.AbstractMethodDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.Annotation;
+import org.eclipse.jdt.internal.compiler.ast.Argument;
 import org.eclipse.jdt.internal.compiler.ast.Assignment;
 import org.eclipse.jdt.internal.compiler.ast.Block;
 import org.eclipse.jdt.internal.compiler.ast.CaseStatement;
@@ -64,7 +66,9 @@ import org.mangosdk.spi.ProviderFor;
 @DeferUntilPostDiet
 public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 	public void handle(AnnotationValues<Cleanup> annotation, Annotation ast, EclipseNode annotationNode) {
-		String cleanupName = annotation.getInstance().value();
+		Cleanup cleanup = annotation.getInstance();
+		String cleanupName = cleanup.value();
+		boolean quietly = cleanup.quietly();
 		if (cleanupName.length() == 0) {
 			annotationNode.addError("cleanupName cannot be the empty string.");
 			return;
@@ -201,6 +205,11 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			}
 			safeClose.nameSourcePosition = nameSourcePosition;
 			safeClose.selector = cleanupName.toCharArray();
+			Statement cleanupCall = safeClose;
+			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(ast, cleanupCall);
+			}
 			
 			varName = new SingleNameReference(decl.name, p);
 			setGeneratedBy(varName, ast);
@@ -209,7 +218,7 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			
 			Block closeBlock = new Block(0);
 			closeBlock.statements = new Statement[1];
-			closeBlock.statements[0] = safeClose;
+			closeBlock.statements[0] = cleanupCall;
 			setGeneratedBy(closeBlock, ast);
 			IfStatement ifStatement = new IfStatement(isClosable, closeBlock, 0, 0);
 			setGeneratedBy(ifStatement, ast);
@@ -232,6 +241,11 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			}
 			unsafeClose.nameSourcePosition = nameSourcePosition;
 			unsafeClose.selector = cleanupName.toCharArray();
+			Statement cleanupCall = unsafeClose;
+			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(ast, cleanupCall);
+			}
 			
 			SingleNameReference varName = new SingleNameReference(decl.name, p);
 			setGeneratedBy(varName, ast);
@@ -246,7 +260,7 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			
 			Block closeBlock = new Block(0);
 			closeBlock.statements = new Statement[1];
-			closeBlock.statements[0] = unsafeClose;
+			closeBlock.statements[0] = cleanupCall;
 			setGeneratedBy(closeBlock, ast);
 			IfStatement ifStatement = new IfStatement(equalExpression, closeBlock, 0, 0);
 			setGeneratedBy(ifStatement, ast);
@@ -276,6 +290,49 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 		}
 		
 		ancestor.rebuild();
+	}
+	
+	private Statement cleanupQuietly(Annotation ast, Statement cleanupCall) {
+		int pS = ast.sourceStart, pE = ast.sourceEnd;
+		long p = (long)pS << 32 | pE;
+		
+		TryStatement tryStatement = new TryStatement();
+		setGeneratedBy(tryStatement, ast);
+		
+		Block tryBlock = new Block(0);
+		setGeneratedBy(tryBlock, ast);
+		tryBlock.statements = new Statement[] { cleanupCall };
+		tryBlock.sourceStart = pS;
+		tryBlock.sourceEnd = pE;
+		
+		tryStatement.tryBlock = tryBlock;
+		
+		String[] x = new String[] { "java", "io", "IOException" };
+		char[][] elems = new char[x.length][];
+		long[] poss = new long[x.length];
+		Arrays.fill(poss, p);
+		for (int i = 0; i < x.length; i++) {
+			elems[i] = x[i].trim().toCharArray();
+		}
+		TypeReference typeReference = new QualifiedTypeReference(elems, poss);
+		setGeneratedBy(typeReference, ast);
+		
+		Argument catchArg = new Argument("$ex".toCharArray(), 0, typeReference, Modifier.FINAL);
+		setGeneratedBy(catchArg, ast);
+		catchArg.sourceStart = 0;
+		catchArg.sourceEnd = 0;
+		catchArg.declarationSourceEnd = catchArg.declarationEnd = -1;
+		
+		Block catchBlock = new Block(0);
+		setGeneratedBy(catchBlock, ast);
+		catchBlock.statements = new Statement[0];
+		catchBlock.sourceStart = pS;
+		catchBlock.sourceEnd = pE;
+		
+		tryStatement.catchArguments = new Argument[] { catchArg };
+		tryStatement.catchBlocks = new Block[] { catchBlock };
+		
+		return tryStatement;
 	}
 	
 	private MessageSend preventNullAnalysis(Annotation ast, Expression expr) {

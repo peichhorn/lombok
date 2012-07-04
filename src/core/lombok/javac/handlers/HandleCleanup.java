@@ -32,6 +32,7 @@ import lombok.javac.ResolutionBased;
 
 import org.mangosdk.spi.ProviderFor;
 
+import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.TypeTags;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.TreeMaker;
@@ -64,7 +65,9 @@ import com.sun.tools.javac.util.Name;
 public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	@Override public void handle(AnnotationValues<Cleanup> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		deleteAnnotationIfNeccessary(annotationNode, Cleanup.class);
-		String cleanupName = annotation.getInstance().value();
+		Cleanup cleanup = annotation.getInstance();
+		String cleanupName = cleanup.value();
+		boolean quietly = cleanup.quietly();
 		if (cleanupName.length() == 0) {
 			annotationNode.addError("cleanupName cannot be the empty string.");
 			return;
@@ -132,6 +135,10 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 			List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
 					maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
 			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(maker, annotationNode, cleanupCall);
+			}
+			
 			JCInstanceOf isClosable = maker.TypeTest(maker.Ident(decl.name), chainDotsString(annotationNode, "java.io.Closeable"));
 			
 			JCIf ifIsClosableCleanup = maker.If(isClosable, maker.Block(0, cleanupCall), null);
@@ -144,6 +151,10 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 			
 			JCMethodInvocation preventNullAnalysis = preventNullAnalysis(maker, annotationNode, maker.Ident(decl.name));
 			JCBinary isNull = maker.Binary(Javac.getCtcInt(JCTree.class, "NE"), preventNullAnalysis, maker.Literal(Javac.getCtcInt(TypeTags.class, "BOT"), null));
+			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(maker, annotationNode, cleanupCall);
+			}
 			
 			JCIf ifNotNullCleanup = maker.If(isNull, maker.Block(0, cleanupCall), null);
 			
@@ -161,6 +172,12 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 		} else throw new AssertionError("Should not get here");
 		
 		ancestor.rebuild();
+	}
+	
+	private List<JCStatement> cleanupQuietly(TreeMaker maker, JavacNode node, List<JCStatement> cleanupCall) {
+		JCVariableDecl catchParam = maker.VarDef(maker.Modifiers(Flags.FINAL), node.toName("$ex"), chainDotsString(node, "java.io.IOException"), null);
+		JCBlock catchBody = maker.at(0).Block(0, List.<JCStatement>nil());
+		return List.<JCStatement>of(maker.Try(maker.Block(0, cleanupCall), List.of(maker.Catch(catchParam, catchBody)), null));
 	}
 	
 	private JCMethodInvocation preventNullAnalysis(TreeMaker maker, JavacNode node, JCExpression expression) {
