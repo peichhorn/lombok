@@ -25,7 +25,6 @@ import static lombok.javac.handlers.JavacHandlerUtil.*;
 
 import lombok.Cleanup;
 import lombok.core.AnnotationValues;
-import lombok.core.AST.Kind;
 import lombok.javac.Javac;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
@@ -71,14 +70,23 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 			return;
 		}
 		
-		if (annotationNode.up().getKind() != Kind.LOCAL) {
+		boolean isLocalDeclaration = false;
+		
+		switch(annotationNode.up().getKind()) {
+		case ARGUMENT:
+			isLocalDeclaration = false;
+			break;
+		case LOCAL:
+			isLocalDeclaration = true;
+			break;
+		default:
 			annotationNode.addError("@Cleanup is legal only on local variable declarations.");
 			return;
 		}
 		
 		JCVariableDecl decl = (JCVariableDecl)annotationNode.up().get();
 		
-		if (decl.init == null) {
+		if (isLocalDeclaration && (decl.init == null)) {
 			annotationNode.addError("@Cleanup variable declarations need to be initialized.");
 			return;
 		}
@@ -102,7 +110,7 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 		ListBuffer<JCStatement> newStatements = ListBuffer.lb();
 		ListBuffer<JCStatement> tryBlock = ListBuffer.lb();
 		for (JCStatement statement : statements) {
-			if (!seenDeclaration) {
+			if (isLocalDeclaration && !seenDeclaration) {
 				if (statement == decl) seenDeclaration = true;
 				newStatements.append(statement);
 			} else {
@@ -110,7 +118,7 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 			}
 		}
 		
-		if (!seenDeclaration) {
+		if (isLocalDeclaration && !seenDeclaration) {
 			annotationNode.addError("LOMBOK BUG: Can't find this local variable declaration inside its parent.");
 			return;
 		}

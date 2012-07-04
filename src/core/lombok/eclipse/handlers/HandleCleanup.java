@@ -27,7 +27,7 @@ import java.util.Arrays;
 
 import lombok.Cleanup;
 import lombok.core.AnnotationValues;
-import lombok.core.AST.Kind;
+import lombok.eclipse.DeferUntilPostDiet;
 import lombok.eclipse.Eclipse;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
@@ -61,6 +61,7 @@ import org.mangosdk.spi.ProviderFor;
  * Handles the {@code lombok.Cleanup} annotation for eclipse.
  */
 @ProviderFor(EclipseAnnotationHandler.class)
+@DeferUntilPostDiet
 public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 	public void handle(AnnotationValues<Cleanup> annotation, Annotation ast, EclipseNode annotationNode) {
 		String cleanupName = annotation.getInstance().value();
@@ -69,14 +70,23 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			return;
 		}
 		
-		if (annotationNode.up().getKind() != Kind.LOCAL) {
+		boolean isLocalDeclaration = false;
+		
+		switch(annotationNode.up().getKind()) {
+		case ARGUMENT:
+			isLocalDeclaration = false;
+			break;
+		case LOCAL:
+			isLocalDeclaration = true;
+			break;
+		default:
 			annotationNode.addError("@Cleanup is legal only on local variable declarations.");
 			return;
 		}
 		
 		LocalDeclaration decl = (LocalDeclaration)annotationNode.up().get();
 		
-		if (decl.initialization == null) {
+		if (isLocalDeclaration && decl.initialization == null) {
 			annotationNode.addError("@Cleanup variable declarations need to be initialized.");
 			return;
 		}
@@ -106,16 +116,17 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 		}
 		
 		int start = 0;
-		for (; start < statements.length ; start++) {
-			if (statements[start] == decl) break;
+		if (isLocalDeclaration) {
+			for (; start < statements.length ; start++) {
+				if (statements[start] == decl) break;
+			}
+			
+			if (start == statements.length) {
+				annotationNode.addError("LOMBOK BUG: Can't find this local variable declaration inside its parent.");
+				return;
+			}
+			start++;  //We start with try{} *AFTER* the var declaration.
 		}
-		
-		if (start == statements.length) {
-			annotationNode.addError("LOMBOK BUG: Can't find this local variable declaration inside its parent.");
-			return;
-		}
-		
-		start++;  //We start with try{} *AFTER* the var declaration.
 		
 		int end;
 		if (isSwitch) {
