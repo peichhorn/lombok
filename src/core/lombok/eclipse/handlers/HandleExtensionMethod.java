@@ -30,7 +30,7 @@ import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import lombok.core.AnnotationValues;
 import lombok.eclipse.EclipseAnnotationHandler;
 import lombok.eclipse.EclipseNode;
-import lombok.experimental.ExtensionMethod;
+import lombok.ExtensionMethod;
 
 // This handler just does some additional error checking; the real work is done in the agent.
 public class HandleExtensionMethod extends EclipseAnnotationHandler<ExtensionMethod> {

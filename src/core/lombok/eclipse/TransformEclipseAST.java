@@ -168,8 +168,8 @@ public class TransformEclipseAST {
 	 * then handles any PrintASTs.
 	 */
 	public void go() {
-		ast.traverse(new AnnotationVisitor(true));
 		handlers.callASTVisitors(ast);
+		ast.traverse(new AnnotationVisitor(true));
 		ast.traverse(new AnnotationVisitor(false));
 	}
 
