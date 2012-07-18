@@ -71,16 +71,17 @@ public class HandleData extends EclipseAnnotationHandler<Data> {
 		new HandleEqualsAndHashCode().generateEqualsAndHashCodeForType(typeNode, annotationNode, callSuper);
 		new HandleToString().generateToStringForType(typeNode, annotationNode, callSuper);
 		
+		final ConstructorData cData = new ConstructorData() //
+			.fieldProvider(FieldProvider.REQUIRED) //
+			.accessLevel(AccessLevel.PUBLIC) //
+			.staticName(staticConstructorName) //
+			.callSuper(callSuper);
 		if (!HandleConstructor.constructorOrConstructorAnnotationExists(typeNode)) {
-			final ConstructorData cData = new ConstructorData() //
-				.fieldProvider(FieldProvider.REQUIRED) //
-				.accessLevel(AccessLevel.PUBLIC) //
-				.staticName(staticConstructorName) //
-				.callSuper(callSuper);
+			new HandleConstructor().generateConstructor(typeNode, ast, cData);
+		} else {
 			if (cData.staticConstructorRequired()) {
 				annotationNode.addWarning("Ignoring static constructor name: explicit @XxxArgsConstructor annotation present; its `staticName` parameter will be used.");
 			}
-			new HandleConstructor().generateConstructor(typeNode, ast, cData);
 		}
 	}
 }

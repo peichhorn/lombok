@@ -53,17 +53,17 @@ import com.sun.tools.javac.tree.JCTree.JCAnnotation;
 		boolean callSuper = data.callSuper();
 		
 		// TODO move this to the end OR move it to the top in eclipse.
-		
+		final ConstructorData cData = new ConstructorData() //
+			.fieldProvider(FieldProvider.REQUIRED) //
+			.accessLevel(AccessLevel.PUBLIC) //
+			.staticName(staticConstructorName) //
+			.callSuper(callSuper);
 		if (!HandleConstructor.constructorOrConstructorAnnotationExists(typeNode)) {
-			final ConstructorData cData = new ConstructorData() //
-					.fieldProvider(FieldProvider.REQUIRED) //
-					.accessLevel(AccessLevel.PUBLIC) //
-					.staticName(staticConstructorName) //
-					.callSuper(callSuper);
+			new HandleConstructor().generateConstructor(typeNode, ast, cData);
+		} else {
 			if (cData.staticConstructorRequired()) {
 				annotationNode.addWarning("Ignoring static constructor name: explicit @XxxArgsConstructor annotation present; its `staticName` parameter will be used.");
 			}
-			new HandleConstructor().generateConstructor(typeNode, ast, cData);
 		}
 		
 		new HandleGetter().generateGetterForType(typeNode, annotationNode, AccessLevel.PUBLIC, true);
