@@ -5,7 +5,7 @@ class CleanupPlain {
     super();
   }
   void test() throws Exception {
-    @lombok.Cleanup InputStream in = new FileInputStream("in");
+    @lombok.Cleanup("close") InputStream in = new FileInputStream("in");
     try 
       {
         @Cleanup OutputStream out = new FileOutputStream("out");
@@ -18,9 +18,9 @@ class CleanupPlain {
           }
         finally
           {
-            if ((java.util.Collections.singletonList(out).get(0) != null))
+            if ((out instanceof java.io.Closeable))
                 {
-                  out.close();
+                  (java.io.Closeable) out.close();
                 }
           }
       }

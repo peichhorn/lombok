@@ -22,15 +22,17 @@
 package lombok.javac.handlers;
 
 import static lombok.javac.handlers.JavacHandlerUtil.*;
+
 import lombok.Cleanup;
-import lombok.core.AST.Kind;
 import lombok.core.AnnotationValues;
 import lombok.javac.Javac;
 import lombok.javac.JavacAnnotationHandler;
 import lombok.javac.JavacNode;
+import lombok.javac.ResolutionBased;
 
 import org.mangosdk.spi.ProviderFor;
 
+import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.TypeTags;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.JCAnnotation;
@@ -44,6 +46,7 @@ import com.sun.tools.javac.tree.JCTree.JCExpressionStatement;
 import com.sun.tools.javac.tree.JCTree.JCFieldAccess;
 import com.sun.tools.javac.tree.JCTree.JCIdent;
 import com.sun.tools.javac.tree.JCTree.JCIf;
+import com.sun.tools.javac.tree.JCTree.JCInstanceOf;
 import com.sun.tools.javac.tree.JCTree.JCMethodDecl;
 import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 import com.sun.tools.javac.tree.JCTree.JCStatement;
@@ -58,25 +61,37 @@ import com.sun.tools.javac.util.Name;
  * Handles the {@code lombok.Cleanup} annotation for javac.
  */
 @ProviderFor(JavacAnnotationHandler.class)
+@ResolutionBased
 public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	@Override public void handle(AnnotationValues<Cleanup> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		if (inNetbeansEditor(annotationNode)) return;
 		
 		deleteAnnotationIfNeccessary(annotationNode, Cleanup.class);
-		String cleanupName = annotation.getInstance().value();
+		Cleanup cleanup = annotation.getInstance();
+		String cleanupName = cleanup.value();
+		boolean quietly = cleanup.quietly();
 		if (cleanupName.length() == 0) {
 			annotationNode.addError("cleanupName cannot be the empty string.");
 			return;
 		}
 		
-		if (annotationNode.up().getKind() != Kind.LOCAL) {
+		boolean isLocalDeclaration = false;
+		
+		switch(annotationNode.up().getKind()) {
+		case ARGUMENT:
+			isLocalDeclaration = false;
+			break;
+		case LOCAL:
+			isLocalDeclaration = true;
+			break;
+		default:
 			annotationNode.addError("@Cleanup is legal only on local variable declarations.");
 			return;
 		}
 		
 		JCVariableDecl decl = (JCVariableDecl)annotationNode.up().get();
 		
-		if (decl.init == null) {
+		if (isLocalDeclaration && (decl.init == null)) {
 			annotationNode.addError("@Cleanup variable declarations need to be initialized.");
 			return;
 		}
@@ -100,7 +115,7 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 		ListBuffer<JCStatement> newStatements = ListBuffer.lb();
 		ListBuffer<JCStatement> tryBlock = ListBuffer.lb();
 		for (JCStatement statement : statements) {
-			if (!seenDeclaration) {
+			if (isLocalDeclaration && !seenDeclaration) {
 				if (statement == decl) seenDeclaration = true;
 				newStatements.append(statement);
 			} else {
@@ -108,23 +123,45 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 			}
 		}
 		
-		if (!seenDeclaration) {
+		if (isLocalDeclaration && !seenDeclaration) {
 			annotationNode.addError("LOMBOK BUG: Can't find this local variable declaration inside its parent.");
 			return;
 		}
 		doAssignmentCheck(annotationNode, tryBlock.toList(), decl.name);
 		
 		TreeMaker maker = annotationNode.getTreeMaker();
-		JCFieldAccess cleanupMethod = maker.Select(maker.Ident(decl.name), annotationNode.toName(cleanupName));
-		List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
-				maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+		JCBlock finalizer;
 		
-		JCMethodInvocation preventNullAnalysis = preventNullAnalysis(maker, annotationNode, maker.Ident(decl.name));
-		JCBinary isNull = maker.Binary(Javac.getCtcInt(JCTree.class, "NE"), preventNullAnalysis, maker.Literal(Javac.getCtcInt(TypeTags.class, "BOT"), null));
-		
-		JCIf ifNotNullCleanup = maker.If(isNull, maker.Block(0, cleanupCall), null);
-		
-		JCBlock finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifNotNullCleanup)), ast);
+		if ("close".equals(cleanupName) && !annotation.isExplicit("value")) {
+			JCFieldAccess cleanupMethod = maker.Select(maker.TypeCast(chainDotsString(annotationNode, "java.io.Closeable"), maker.Ident(decl.name)), annotationNode.toName(cleanupName));
+			List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
+					maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(maker, annotationNode, cleanupCall);
+			}
+			
+			JCInstanceOf isClosable = maker.TypeTest(maker.Ident(decl.name), chainDotsString(annotationNode, "java.io.Closeable"));
+			
+			JCIf ifIsClosableCleanup = maker.If(isClosable, maker.Block(0, cleanupCall), null);
+			
+			finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifIsClosableCleanup)), ast);
+		} else {
+			JCFieldAccess cleanupMethod = maker.Select(maker.Ident(decl.name), annotationNode.toName(cleanupName));
+			List<JCStatement> cleanupCall = List.<JCStatement>of(maker.Exec(
+					maker.Apply(List.<JCExpression>nil(), cleanupMethod, List.<JCExpression>nil())));
+			
+			JCMethodInvocation preventNullAnalysis = preventNullAnalysis(maker, annotationNode, maker.Ident(decl.name));
+			JCBinary isNull = maker.Binary(Javac.getCtcInt(JCTree.class, "NE"), preventNullAnalysis, maker.Literal(Javac.getCtcInt(TypeTags.class, "BOT"), null));
+			
+			if (quietly) {
+				cleanupCall = cleanupQuietly(maker, annotationNode, cleanupCall);
+			}
+			
+			JCIf ifNotNullCleanup = maker.If(isNull, maker.Block(0, cleanupCall), null);
+			
+			finalizer = recursiveSetGeneratedBy(maker.Block(0, List.<JCStatement>of(ifNotNullCleanup)), ast);
+		}
 		
 		newStatements.append(setGeneratedBy(maker.Try(setGeneratedBy(maker.Block(0, tryBlock.toList()), ast), List.<JCCatch>nil(), finalizer), ast));
 		
@@ -139,6 +176,12 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 		ancestor.rebuild();
 	}
 	
+	private List<JCStatement> cleanupQuietly(TreeMaker maker, JavacNode node, List<JCStatement> cleanupCall) {
+		JCVariableDecl catchParam = maker.VarDef(maker.Modifiers(Flags.FINAL), node.toName("$ex"), chainDotsString(node, "java.io.IOException"), null);
+		JCBlock catchBody = maker.at(0).Block(0, List.<JCStatement>nil());
+		return List.<JCStatement>of(maker.Try(maker.Block(0, cleanupCall), List.of(maker.Catch(catchParam, catchBody)), null));
+	}
+	
 	private JCMethodInvocation preventNullAnalysis(TreeMaker maker, JavacNode node, JCExpression expression) {
 		JCMethodInvocation singletonList = maker.Apply(List.<JCExpression>nil(), chainDotsString(node, "java.util.Collections.singletonList"), List.of(expression));
 		JCMethodInvocation cleanedExpr = maker.Apply(List.<JCExpression>nil(), maker.Select(singletonList, node.toName("get")) , List.<JCExpression>of(maker.Literal(TypeTags.INT, 0)));
@@ -151,8 +194,7 @@ public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	
 	private void doAssignmentCheck0(JavacNode node, JCTree statement, Name name) {
 		if (statement instanceof JCAssign) doAssignmentCheck0(node, ((JCAssign)statement).rhs, name);
-		if (statement instanceof JCExpressionStatement) doAssignmentCheck0(node,
-				((JCExpressionStatement)statement).expr, name);
+		if (statement instanceof JCExpressionStatement) doAssignmentCheck0(node, ((JCExpressionStatement)statement).expr, name);
 		if (statement instanceof JCVariableDecl) doAssignmentCheck0(node, ((JCVariableDecl)statement).init, name);
 		if (statement instanceof JCTypeCast) doAssignmentCheck0(node, ((JCTypeCast)statement).expr, name);
 		if (statement instanceof JCIdent) {

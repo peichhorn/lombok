@@ -74,9 +74,12 @@ import java.lang.annotation.Target;
  * <p>
  * However, in java 1.6, generating the code to do this is prohibitively complicated.
  */
-@Target(ElementType.LOCAL_VARIABLE)
+@Target({ElementType.LOCAL_VARIABLE, ElementType.PARAMETER})
 @Retention(RetentionPolicy.SOURCE)
 public @interface Cleanup {
 	/** The name of the method that cleans up the resource. By default, 'close'. The method must not have any parameters. */
 	String value() default "close";
+
+	/** Specify whether the clean up of the resource should be quietly or not. The default value is false */
+	boolean quietly() default false;
 }
