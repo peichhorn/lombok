@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 import lombok.Lombok;
+import lombok.core.AST.Kind;
 import lombok.core.AnnotationValues;
 import lombok.core.PrintAST;
 import lombok.core.SpiLoadUtil;
@@ -42,7 +43,11 @@ import lombok.core.AnnotationValues.AnnotationValueDecodeFail;
 
 import org.eclipse.jdt.internal.compiler.ast.ASTNode;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
+import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeReference;
+import org.eclipse.jdt.internal.compiler.impl.ITypeRequestor;
+import org.eclipse.jdt.internal.compiler.lookup.CompilationUnitScope;
+import org.eclipse.jdt.internal.compiler.lookup.TypeBinding;
 
 /**
  * This class tracks 'handlers' and knows how to invoke them for any given AST node.
@@ -82,6 +87,10 @@ public class HandlerLibrary {
 		
 		public boolean deferUntilPostDiet() {
 			return handler.getClass().isAnnotationPresent(DeferUntilPostDiet.class);
+		}
+		
+		public boolean deferUntilBuildFieldsAndMethods() {
+			return handler.getClass().isAnnotationPresent(DeferUntilBuildFieldsAndMethods.class);
 		}
 	}
 	
@@ -184,6 +193,7 @@ public class HandlerLibrary {
 			AnnotationHandlerContainer<?> container = annotationHandlers.get(fqn);
 			
 			if (container == null) continue;
+			if (container.deferUntilBuildFieldsAndMethods()) continue;
 			if (!annotationNode.isCompleteParse() && container.deferUntilPostDiet()) {
 				if (needsHandling(annotation)) container.preHandle(annotation, annotationNode);
 				continue;
@@ -197,6 +207,52 @@ public class HandlerLibrary {
 				error(ast, String.format("Lombok annotation handler %s failed", container.handler.getClass()), t);
 			}
 		}
+	}
+	
+	public void handleAnnotationOnBuildFieldsAndMethods(EclipseNode typeNode, org.eclipse.jdt.internal.compiler.ast.Annotation annotation) {
+		TypeDeclaration decl = (TypeDeclaration) typeNode.get();
+		TypeBinding tb = resolveAnnotation(decl, annotation);
+		if (tb == null) return;
+		AnnotationHandlerContainer<?> container = annotationHandlers.get(new String(tb.readableName()));
+		if (container == null) return;
+		if (!container.deferUntilBuildFieldsAndMethods()) return;
+		EclipseNode annotationNode = typeNode.getAst().get(annotation);
+		if (isMethodAnnotation(annotationNode) && !typeNode.isCompleteParse() && (decl.scope != null)) {
+			final CompilationUnitScope cus = decl.scope.compilationUnitScope();
+			final ITypeRequestor typeRequestor = cus.environment().typeRequestor;
+			if (typeRequestor instanceof org.eclipse.jdt.internal.compiler.Compiler) {
+				final org.eclipse.jdt.internal.compiler.Compiler c = (org.eclipse.jdt.internal.compiler.Compiler) typeRequestor;
+				try {
+					c.parser.getMethodBodies(cus.referenceContext);
+					typeNode.rebuild();
+				} catch (Exception e) {
+					// better break here
+				}
+			}
+		}
+		try {
+			if (checkAndSetHandled(annotation)) container.handle(annotation, annotationNode);
+		} catch (AnnotationValueDecodeFail fail) {
+			fail.owner.setError(fail.getMessage(), fail.idx);
+		}
+	}
+	
+	private boolean isMethodAnnotation(EclipseNode annotationNode) {
+		EclipseNode parent = annotationNode.up();
+		if (parent == null) return false;
+		return parent.getKind() == Kind.METHOD;
+	}
+	
+	private TypeBinding resolveAnnotation(TypeDeclaration decl, org.eclipse.jdt.internal.compiler.ast.Annotation ann) {
+		TypeBinding tb = ann.resolvedType;
+		if ((tb == null) && (ann.type != null)) {
+			try {
+				tb = ann.type.resolveType(decl.initializerScope);
+			} catch (final Exception ignore) {
+				// completion nodes may throw an exception here
+			}
+		}
+		return tb;
 	}
 	
 	/**

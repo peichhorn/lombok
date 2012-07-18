@@ -148,6 +148,26 @@ public class JavacHandlerUtil {
 	}
 	
 	/**
+	 * Checks if the field should be included in operations that work on 'all'
+	 * fields: If the field is static, or starts with a '$', or is actually an
+	 * enum constant, 'false' is returned, indicating you should skip it.
+	 */
+	public static boolean filterField(JCVariableDecl fieldDecl) {
+		long fieldFlags = fieldDecl.mods.flags;
+		
+		// Skip the fake fields that represent enum constants.
+		if ((fieldFlags & Flags.ENUM) != 0) return false;
+		
+		// Skip fields that start with $
+		if (fieldDecl.name.toString().startsWith("$")) return false;
+		
+		// Skip static fields.
+		if ((fieldFlags & Flags.STATIC) != 0) return false;
+		
+		return true;
+	}
+	
+	/**
 	 * Checks if the given TypeReference node is likely to be a reference to the provided class.
 	 * 
 	 * @param type An actual type. This method checks if {@code typeNode} is likely to be a reference to this type.

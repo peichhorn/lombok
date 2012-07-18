@@ -21,10 +21,12 @@
  */
 package lombok.eclipse;
 
-import static lombok.eclipse.handlers.EclipseHandlerUtil.error;
+import static lombok.eclipse.handlers.EclipseHandlerUtil.*;
+import org.eclipse.jdt.internal.compiler.ast.AbstractVariableDeclaration;
 
 import java.lang.reflect.Field;
 
+import lombok.core.AST.Kind;
 import lombok.core.debug.DebugSnapshotStore;
 import lombok.patcher.Symbols;
 
@@ -35,6 +37,7 @@ import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.FieldDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.LocalDeclaration;
 import org.eclipse.jdt.internal.compiler.ast.TypeDeclaration;
+import org.eclipse.jdt.internal.compiler.lookup.ClassScope;
 import org.eclipse.jdt.internal.compiler.parser.Parser;
 
 /**
@@ -168,6 +171,38 @@ public class TransformEclipseAST {
 		ast.traverse(new AnnotationVisitor(true));
 		handlers.callASTVisitors(ast);
 		ast.traverse(new AnnotationVisitor(false));
+	}
+
+	public static boolean handleAnnotationOnBuildFieldsAndMethods(ClassScope scope) {
+		if (disableLombok) return false;
+		
+		if (Symbols.hasSymbol("lombok.disable")) return false;
+		
+		TypeDeclaration decl = scope.referenceContext;
+		if (decl == null) return false;
+		CompilationUnitDeclaration cud = decl.scope.compilationUnitScope().referenceContext;
+		EclipseAST ast = getAST(cud, false);
+		EclipseNode typeNode = ast.get(decl);
+		if (typeNode == null) {
+			ast = getAST(cud, true);
+			typeNode = ast.get(decl);
+		}
+		if (typeNode == null) return false;
+		if (decl.annotations != null) for (Annotation ann : decl.annotations) {
+			handlers.handleAnnotationOnBuildFieldsAndMethods(typeNode, ann);
+		}
+		for (EclipseNode child : typeNode.down()) {
+			Annotation[] annotations = null;
+			if (child.getKind() == Kind.METHOD) {
+				annotations = ((AbstractMethodDeclaration) child.get()).annotations;
+			} else if (child.getKind() == Kind.FIELD) {
+				annotations = ((AbstractVariableDeclaration) child.get()).annotations;
+			}
+			if (annotations != null) for (Annotation ann : annotations) {
+				handlers.handleAnnotationOnBuildFieldsAndMethods(typeNode, ann);
+			}
+		}
+		return false;
 	}
 	
 	private static class AnnotationVisitor extends EclipseASTAdapter {

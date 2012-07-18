@@ -45,6 +45,7 @@ import java.lang.annotation.Target;
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.SOURCE)
 public @interface Data {
+	
 	/**
 	 * If you specify a static constructor name, then the generated constructor will be private, and
 	 * instead a static factory method is created that other classes can use to create instances.
@@ -57,4 +58,12 @@ public @interface Data {
 	 * Default: No static constructor, instead the normal constructor is public.
 	 */
 	String staticConstructor() default "";
+	
+	/**
+	 * Include the result of the superclass's implementation of {@code toString} in the output.
+	 * And Call on the superclass's implementations of {@code equals} and {@code hashCode} before calculating
+	 * for the fields in this class.
+	 * <strong>default: false</strong>
+	 */
+	boolean callSuper() default false;
 }

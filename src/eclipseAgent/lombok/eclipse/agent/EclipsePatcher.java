@@ -535,12 +535,20 @@ public class EclipsePatcher extends Agent {
 				.target(new MethodTarget(PARSER_SIG, "endParse", CUD_SIG, "int"))
 				.wrapMethod(new Hook("lombok.eclipse.TransformEclipseAST", "transform_swapped", "void", CUD_SIG, PARSER_SIG))
 				.request(StackRequest.THIS, StackRequest.RETURN_VALUE).build());
+		
+		final String CLASSSCOPE = "org.eclipse.jdt.internal.compiler.lookup.ClassScope";
+		sm.addScript(ScriptBuilder.exitEarly()
+			.target(new MethodTarget(CLASSSCOPE, "buildFieldsAndMethods", "void"))
+			.request(StackRequest.THIS)
+			.decisionMethod(new Hook("lombok.eclipse.TransformEclipseAST", "handleAnnotationOnBuildFieldsAndMethods", "boolean", CLASSSCOPE))
+			.build());
 	}
 	
 	private static void patchEcjTransformers(ScriptManager sm, boolean ecj) {
 		addPatchesForDelegate(sm, ecj);
 		addPatchesForVal(sm);
 		if (!ecj) addPatchesForValEclipse(sm);
+		if (!ecj) addPatchesForConstructorAndDataEclipse(sm);
 	}
 	
 	private static void addPatchesForDelegate(ScriptManager sm, boolean ecj) {
@@ -631,6 +639,19 @@ public class EclipsePatcher extends Agent {
 				.target(new MethodTarget(FOREACHSTATEMENT_SIG, "resolve", "void", BLOCKSCOPE_SIG))
 				.request(StackRequest.THIS, StackRequest.PARAM1)
 				.decisionMethod(new Hook("lombok.eclipse.agent.PatchVal", "handleValForForEach", "boolean", FOREACHSTATEMENT_SIG, BLOCKSCOPE_SIG))
+				.build());
+	}
+	
+	private static void addPatchesForConstructorAndDataEclipse(ScriptManager sm) {
+		final String SOURCEELEMENTNOTIFIER = "org.eclipse.jdt.internal.compiler.SourceElementNotifier";
+		final String FIELDDECLARATION = "org.eclipse.jdt.internal.compiler.ast.FieldDeclaration";
+		final String TYPEDECLARATION = "org.eclipse.jdt.internal.compiler.ast.TypeDeclaration";
+		final String ISOURCEELEMENTREQUESTOR = "org.eclipse.jdt.internal.compiler.ISourceElementRequestor";
+		sm.addScript(ScriptBuilder.replaceMethodCall()
+				.target(new MethodTarget(SOURCEELEMENTNOTIFIER, "notifySourceElementRequestor", "void", FIELDDECLARATION, TYPEDECLARATION))
+				.methodToReplace(new Hook(ISOURCEELEMENTREQUESTOR, "exitField", "void", "int", "int", "int"))
+				.requestExtra(StackRequest.PARAM1, StackRequest.PARAM2)
+				.replacementMethod(new Hook("lombok.eclipse.agent.PatchConstructorAndDataEclipsePortal", "onSourceElementRequestor_exitField", "void", "java.lang.Object", "int", "int", "int", FIELDDECLARATION, TYPEDECLARATION))
 				.build());
 	}
 	
