@@ -195,6 +195,7 @@ public class HandleCleanup extends EclipseAnnotationHandler<Cleanup> {
 			setGeneratedBy(safeClose, ast);
 			safeClose.sourceStart = ast.sourceStart;
 			safeClose.sourceEnd = ast.sourceEnd;
+			safeClose.statementEnd = ast.sourceEnd;
 			safeClose.receiver = castExpression;
 			long nameSourcePosition = (long)ast.sourceStart << 32 | ast.sourceEnd;
 			if (ast.memberValuePairs() != null) for (MemberValuePair pair : ast.memberValuePairs()) {
