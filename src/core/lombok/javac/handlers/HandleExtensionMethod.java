@@ -63,8 +63,7 @@ import com.sun.tools.javac.tree.JCTree.JCMethodInvocation;
 @ResolutionBased
 public class HandleExtensionMethod extends JavacAnnotationHandler<ExtensionMethod> {
 	@Override
-	public void handle(final AnnotationValues<ExtensionMethod> annotation, final JCAnnotation source, final JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, ExtensionMethod.class);
+	public void handle(final AnnotationValues<ExtensionMethod> annotation, final JCAnnotation source, final JavacNode annotationNode) {;
 		JavacNode typeNode = annotationNode.up();
 		boolean isClassOrEnum = isClassOrEnum(typeNode);
 		

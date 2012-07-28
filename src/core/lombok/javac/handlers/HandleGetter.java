@@ -136,8 +136,6 @@ public class HandleGetter extends JavacAnnotationHandler<Getter> {
 	
 	@Override public void handle(AnnotationValues<Getter> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		Collection<JavacNode> fields = annotationNode.upFromAnnotationToFields();
-		deleteAnnotationIfNeccessary(annotationNode, Getter.class);
-		deleteImportFromCompilationUnit(annotationNode, "lombok.AccessLevel");
 		JavacNode node = annotationNode.up();
 		Getter annotationInstance = annotation.getInstance();
 		AccessLevel level = annotationInstance.value();
@@ -156,7 +154,10 @@ public class HandleGetter extends JavacAnnotationHandler<Getter> {
 			createGetterForFields(level, fields, annotationNode, true, lazy);
 			break;
 		case TYPE:
-			if (lazy) annotationNode.addError("'lazy' is not supported for @Getter on a type.");
+			if (lazy) {
+				annotationNode.addError("'lazy' is not supported for @Getter on a type.");
+				return;
+			}
 			generateGetterForType(node, annotationNode, level, false);
 			break;
 		}

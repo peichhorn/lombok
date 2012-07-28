@@ -73,6 +73,11 @@ public class JavacTransformer {
 				ast.traverse(new AnnotationVisitor());
 			}
 			
+			handlers.setDeleteAnnoationAndImportPhase();
+			for (JavacAST ast : asts) {
+				ast.traverse(new AnnotationVisitor());
+			}
+			
 			handlers.setPrintASTPhase();
 			for (JavacAST ast : asts) {
 				ast.traverse(new AnnotationVisitor());

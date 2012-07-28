@@ -50,7 +50,6 @@ public class HandleLog {
 	}
 	
 	public static void processAnnotation(LoggingFramework framework, AnnotationValues<?> annotation, JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, framework.getAnnotationClass());
 		
 		JavacNode typeNode = annotationNode.up();
 		switch (typeNode.getKind()) {

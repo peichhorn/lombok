@@ -176,8 +176,8 @@ public class HandlerLibrary {
 		String rawType = annotation.annotationType.toString();
 		for (String fqn : resolver.findTypeMatches(node, typeLibrary, rawType)) {
 			boolean isPrintAST = fqn.equals(PrintAST.class.getName());
-			if (isPrintAST && phase != 2) continue;
-			if (!isPrintAST && phase == 2) continue;
+			if (isPrintAST && phase != 3) continue;
+			if (!isPrintAST && phase == 3) continue;
 			AnnotationHandlerContainer<?> container = annotationHandlers.get(fqn);
 			if (container == null) continue;
 			
@@ -188,7 +188,13 @@ public class HandlerLibrary {
 				if (!container.isResolutionBased() && phase == 0) {
 					if (checkAndSetHandled(annotation)) container.handle(node);
 				}
-				if (container.annotationClass == PrintAST.class && phase == 2) {
+				if (phase == 2) {
+					if (node.shouldDeleteLombokAnnotations()) {
+						JavacHandlerUtil.deleteImportFromCompilationUnit(node, "lombok.AccessLevel");
+						JavacHandlerUtil.deleteAnnotationIfNeccessary(node, container.annotationClass);
+					}
+				}
+				if (container.annotationClass == PrintAST.class && phase == 3) {
 					if (checkAndSetHandled(annotation)) container.handle(node);
 				}
 			} catch (AnnotationValueDecodeFail fail) {
@@ -226,7 +232,11 @@ public class HandlerLibrary {
 		phase = 1;
 	}
 	
-	public void setPrintASTPhase() {
+	public void setDeleteAnnoationAndImportPhase() {
 		phase = 2;
+	}
+	
+	public void setPrintASTPhase() {
+		phase = 3;
 	}
 }

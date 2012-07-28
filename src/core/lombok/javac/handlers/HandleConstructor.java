@@ -108,9 +108,6 @@ public class HandleConstructor {
 	}
 	
 	private void handle(final JavacNode annotationNode, final Class<? extends Annotation> annotationType, final ConstructorData data) {
-		deleteAnnotationIfNeccessary(annotationNode, annotationType);
-		deleteImportFromCompilationUnit(annotationNode, "lombok.AccessLevel");
-		
 		JavacNode typeNode = annotationNode.up();
 		JCClassDecl typeDecl = null;
 		if (typeNode.get() instanceof JCClassDecl) typeDecl = (JCClassDecl) typeNode.get();

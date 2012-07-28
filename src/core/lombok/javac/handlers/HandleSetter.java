@@ -131,8 +131,6 @@ public class HandleSetter extends JavacAnnotationHandler<Setter> {
 	
 	@Override public void handle(AnnotationValues<Setter> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		Collection<JavacNode> fields = annotationNode.upFromAnnotationToFields();
-		deleteAnnotationIfNeccessary(annotationNode, Setter.class);
-		deleteImportFromCompilationUnit(annotationNode, "lombok.AccessLevel");
 		JavacNode node = annotationNode.up();
 		AccessLevel level = annotation.getInstance().value();
 		

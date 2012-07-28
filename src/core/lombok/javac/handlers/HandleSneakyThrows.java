@@ -53,7 +53,6 @@ import com.sun.tools.javac.util.List;
 @ProviderFor(JavacAnnotationHandler.class)
 public class HandleSneakyThrows extends JavacAnnotationHandler<SneakyThrows> {
 	@Override public void handle(AnnotationValues<SneakyThrows> annotation, JCAnnotation ast, JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, SneakyThrows.class);
 		Collection<String> exceptionNames = annotation.getRawExpressions("value");
 		if (exceptionNames.isEmpty()) {
 			exceptionNames = Collections.singleton("java.lang.Throwable");

@@ -39,7 +39,6 @@ import com.sun.tools.javac.tree.JCTree.JCAnnotation;
  */
 @ProviderFor(JavacAnnotationHandler.class) public class HandleData extends JavacAnnotationHandler<Data> {
 	@Override public void handle(AnnotationValues<Data> annotation, JCAnnotation ast, JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, Data.class);
 		JavacNode typeNode = annotationNode.up();
 		boolean notAClass = !isClass(typeNode);
 		

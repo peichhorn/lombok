@@ -54,7 +54,6 @@ public class HandleSynchronized extends JavacAnnotationHandler<Synchronized> {
 	@Override public void handle(AnnotationValues<Synchronized> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		if (inNetbeansEditor(annotationNode)) return;
 		
-		deleteAnnotationIfNeccessary(annotationNode, Synchronized.class);
 		JavacNode methodNode = annotationNode.up();
 		
 		if (methodNode == null || methodNode.getKind() != Kind.METHOD || !(methodNode.get() instanceof JCMethodDecl)) {

@@ -65,8 +65,6 @@ import com.sun.tools.javac.util.Name;
 public class HandleCleanup extends JavacAnnotationHandler<Cleanup> {
 	@Override public void handle(AnnotationValues<Cleanup> annotation, JCAnnotation ast, JavacNode annotationNode) {
 		if (inNetbeansEditor(annotationNode)) return;
-		
-		deleteAnnotationIfNeccessary(annotationNode, Cleanup.class);
 		Cleanup cleanup = annotation.getInstance();
 		String cleanupName = cleanup.value();
 		boolean quietly = cleanup.quietly();

@@ -21,8 +21,6 @@
  */
 package lombok.javac.handlers;
 
-import static lombok.javac.handlers.JavacHandlerUtil.deleteAnnotationIfNeccessary;
-
 import org.mangosdk.spi.ProviderFor;
 
 import com.sun.tools.javac.tree.JCTree.JCAnnotation;
@@ -35,8 +33,6 @@ import lombok.javac.JavacNode;
 @ProviderFor(JavacAnnotationHandler.class)
 public class HandleAccessors extends JavacAnnotationHandler<Accessors> {
 	@Override public void handle(AnnotationValues<Accessors> annotation, JCAnnotation ast, JavacNode annotationNode) {
-		// Accessors itself is handled by HandleGetter/Setter; this is just to ensure that the annotation is removed
-		// from the AST when delomboking.
-		deleteAnnotationIfNeccessary(annotationNode, Accessors.class);
+		// Accessors itself is handled by HandleGetter/Setter
 	}
 }

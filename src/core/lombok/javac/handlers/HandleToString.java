@@ -69,8 +69,6 @@ public class HandleToString extends JavacAnnotationHandler<ToString> {
 	}
 	
 	@Override public void handle(AnnotationValues<ToString> annotation, JCAnnotation ast, JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, ToString.class);
-		
 		ToString ann = annotation.getInstance();
 		List<String> excludes = List.from(ann.exclude());
 		List<String> includes = List.from(ann.of());

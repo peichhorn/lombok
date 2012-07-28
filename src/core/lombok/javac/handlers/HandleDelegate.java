@@ -92,8 +92,6 @@ public class HandleDelegate extends JavacAnnotationHandler<Delegate> {
 			"finalize()"));
 	
 	@Override public void handle(AnnotationValues<Delegate> annotation, JCAnnotation ast, JavacNode annotationNode) {
-		deleteAnnotationIfNeccessary(annotationNode, Delegate.class);
-		
 		Type delegateType;
 		Name delegateName = annotationNode.toName(annotationNode.up().getName());
 		DelegateReceiver delegateReceiver;
